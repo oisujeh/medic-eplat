@@ -9,16 +9,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import AuthClinicalLayout from '@/layouts/auth/AuthClinicalLayout.vue';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
-defineOptions({
-    layout: {
-        title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
-    },
-});
+defineOptions({ layout: AuthClinicalLayout });
 
 defineProps<{
     status?: string;
@@ -30,8 +26,24 @@ defineProps<{
     <Head title="Log in" />
 
     <div
+        class="mb-[1.8rem] flex justify-between border-b border-[var(--cl-line)] pb-[0.9rem] font-[family-name:var(--cl-font-mono)] text-[0.68rem] tracking-[0.12em] text-[var(--cl-ink-faint)] uppercase"
+    >
+        <span>Staff access</span>
+        <span>Facility 04A</span>
+    </div>
+
+    <h2
+        class="font-[family-name:var(--cl-font-display)] text-[1.5rem] font-medium text-[var(--cl-navy)]"
+    >
+        Sign in to your station
+    </h2>
+    <p class="mt-1 mb-8 text-[0.85rem] text-[var(--cl-ink-soft)]">
+        Enter your credentials to access patient records and ward tools.
+    </p>
+
+    <div
         v-if="status"
-        class="mb-4 text-center text-sm font-medium text-green-600"
+        class="mb-4 text-center text-sm font-medium text-[var(--cl-teal-deep)]"
     >
         {{ status }}
     </div>
@@ -42,69 +54,96 @@ defineProps<{
         v-bind="store.form()"
         :reset-on-success="['password']"
         v-slot="{ errors, processing }"
-        class="flex flex-col gap-6"
+        class="flex flex-col gap-[1.1rem]"
     >
-        <div class="grid gap-6">
-            <div class="grid gap-2">
-                <Label for="email">Email address</Label>
-                <Input
-                    id="email"
-                    type="email"
-                    name="email"
-                    required
-                    autofocus
-                    :tabindex="1"
-                    autocomplete="email"
-                    placeholder="email@example.com"
-                />
-                <InputError :message="errors.email" />
-            </div>
-
-            <div class="grid gap-2">
-                <div class="flex items-center justify-between">
-                    <Label for="password">Password</Label>
-                    <TextLink
-                        v-if="canResetPassword"
-                        :href="request()"
-                        class="text-sm"
-                        :tabindex="5"
-                    >
-                        Forgot your password?
-                    </TextLink>
-                </div>
-                <PasswordInput
-                    id="password"
-                    name="password"
-                    required
-                    :tabindex="2"
-                    autocomplete="current-password"
-                    placeholder="Password"
-                />
-                <InputError :message="errors.password" />
-            </div>
-
-            <div class="flex items-center justify-between">
-                <Label for="remember" class="flex items-center space-x-3">
-                    <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span>Remember me</span>
-                </Label>
-            </div>
-
-            <Button
-                type="submit"
-                class="mt-4 w-full"
-                :tabindex="4"
-                :disabled="processing"
-                data-test="login-button"
+        <div class="grid gap-[0.4rem]">
+            <Label
+                for="email"
+                class="text-[0.8rem] font-medium text-[var(--cl-ink-soft)]"
             >
-                <Spinner v-if="processing" />
-                Log in
-            </Button>
+                Email address
+            </Label>
+            <Input
+                id="email"
+                type="email"
+                name="email"
+                required
+                autofocus
+                :tabindex="1"
+                autocomplete="email"
+                placeholder="email@example.com"
+                class="h-auto rounded-[3px] border-[var(--cl-line)] bg-[var(--cl-white)] px-[0.85rem] py-[0.7rem] text-[0.9rem] text-[var(--cl-ink)] placeholder:text-[var(--cl-ink-faint)] focus-visible:border-[var(--cl-teal)] focus-visible:ring-[var(--cl-teal-light)] dark:bg-[var(--cl-white)]"
+            />
+            <InputError :message="errors.email" />
         </div>
 
-        <div class="text-center text-sm text-muted-foreground">
-            Don't have an account?
-            <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
+        <div class="grid gap-[0.4rem]">
+            <div class="flex items-center justify-between">
+                <Label
+                    for="password"
+                    class="text-[0.8rem] font-medium text-[var(--cl-ink-soft)]"
+                >
+                    Password
+                </Label>
+                <TextLink
+                    v-if="canResetPassword"
+                    :href="request()"
+                    class="text-[0.78rem] text-[var(--cl-teal)]!"
+                    :tabindex="5"
+                >
+                    Forgot your password?
+                </TextLink>
+            </div>
+            <PasswordInput
+                id="password"
+                name="password"
+                required
+                :tabindex="2"
+                autocomplete="current-password"
+                placeholder="Password"
+                class="h-auto rounded-[3px] border-[var(--cl-line)] bg-[var(--cl-white)] px-[0.85rem] py-[0.7rem] text-[0.9rem] text-[var(--cl-ink)] placeholder:text-[var(--cl-ink-faint)] focus-visible:border-[var(--cl-teal)] focus-visible:ring-[var(--cl-teal-light)] dark:bg-[var(--cl-white)]"
+            />
+            <InputError :message="errors.password" />
         </div>
+
+        <Label
+            for="remember"
+            class="flex items-center gap-[0.6rem] text-[0.8rem] font-normal text-[var(--cl-ink-soft)]"
+        >
+            <Checkbox
+                id="remember"
+                name="remember"
+                :tabindex="3"
+                class="rounded-[3px] border-[var(--cl-ink-faint)] focus-visible:border-[var(--cl-teal)] focus-visible:ring-[var(--cl-teal-light)] data-[state=checked]:border-[var(--cl-navy)] data-[state=checked]:bg-[var(--cl-navy)] data-[state=checked]:text-white"
+            />
+            <span>Remember me</span>
+        </Label>
+
+        <Button
+            type="submit"
+            class="mt-[0.4rem] h-auto w-full rounded-[3px] bg-[var(--cl-navy)] py-[0.8rem] text-[0.88rem] font-medium text-white hover:bg-[var(--cl-navy-light)]"
+            :tabindex="4"
+            :disabled="processing"
+            data-test="login-button"
+        >
+            <Spinner v-if="processing" />
+            Sign in
+        </Button>
     </Form>
+
+    <div
+        class="mt-[1.4rem] text-center text-[0.8rem] text-[var(--cl-ink-faint)]"
+    >
+        Don't have an account?
+        <TextLink :href="register()" class="text-[var(--cl-teal)]!" :tabindex="5">
+            Sign up
+        </TextLink>
+    </div>
+
+    <div
+        class="mt-[1.8rem] inline-flex items-center gap-[0.4rem] rounded-full bg-[var(--cl-teal-light)] px-[0.6rem] py-[0.3rem] font-[family-name:var(--cl-font-mono)] text-[0.68rem] text-[var(--cl-teal-deep)]"
+    >
+        <span class="h-[6px] w-[6px] rounded-full bg-[var(--cl-teal)]" />
+        Works offline — data syncs when connection returns
+    </div>
 </template>
