@@ -45,7 +45,7 @@
                 </p>
 
                 <div
-                    class="mt-10 flex gap-[2.2rem] border-t border-white/10 pt-[1.6rem]"
+                    class="mt-10 flex gap-[5.2rem] border-t border-white/10 pt-[1.6rem]"
                 >
                     <div v-for="stat in vitals" :key="stat.label">
                         <div

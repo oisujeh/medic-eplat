@@ -59,6 +59,21 @@ const user = computed(() => page.props.auth.user);
             </div>
 
             <div class="grid gap-2">
+                <Label for="username">Username</Label>
+                <Input
+                    id="username"
+                    type="text"
+                    class="mt-1 block w-full"
+                    name="username"
+                    :default-value="user.username ?? ''"
+                    required
+                    autocomplete="username"
+                    placeholder="Username"
+                />
+                <InputError class="mt-2" :message="errors.username" />
+            </div>
+
+            <div class="grid gap-2">
                 <Label for="email">Email address</Label>
                 <Input
                     id="email"
@@ -67,7 +82,7 @@ const user = computed(() => page.props.auth.user);
                     name="email"
                     :default-value="user.email"
                     required
-                    autocomplete="username"
+                    autocomplete="email"
                     placeholder="Email address"
                 />
                 <InputError class="mt-2" :message="errors.email" />

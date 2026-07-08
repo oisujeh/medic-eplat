@@ -3,16 +3,13 @@ import { Form, Head } from '@inertiajs/vue3';
 import InputError from '@/components/InputError.vue';
 import PasskeyVerify from '@/components/PasskeyVerify.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
-import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthClinicalLayout from '@/layouts/auth/AuthClinicalLayout.vue';
-import { register } from '@/routes';
 import { store } from '@/routes/login';
-import { request } from '@/routes/password';
 
 defineOptions({ layout: AuthClinicalLayout });
 
@@ -58,23 +55,23 @@ defineProps<{
     >
         <div class="grid gap-[0.4rem]">
             <Label
-                for="email"
+                for="login"
                 class="text-[0.8rem] font-medium text-[var(--cl-ink-soft)]"
             >
-                Email address
+                Email or username
             </Label>
             <Input
-                id="email"
-                type="email"
-                name="email"
+                id="login"
+                type="text"
+                name="login"
                 required
                 autofocus
                 :tabindex="1"
-                autocomplete="email"
-                placeholder="email@example.com"
+                autocomplete="username"
+                placeholder="email@example.com or username"
                 class="h-auto rounded-[3px] border-[var(--cl-line)] bg-[var(--cl-white)] px-[0.85rem] py-[0.7rem] text-[0.9rem] text-[var(--cl-ink)] placeholder:text-[var(--cl-ink-faint)] focus-visible:border-[var(--cl-teal)] focus-visible:ring-[var(--cl-teal-light)] dark:bg-[var(--cl-white)]"
             />
-            <InputError :message="errors.email" />
+            <InputError :message="errors.login" />
         </div>
 
         <div class="grid gap-[0.4rem]">
@@ -85,14 +82,7 @@ defineProps<{
                 >
                     Password
                 </Label>
-                <TextLink
-                    v-if="canResetPassword"
-                    :href="request()"
-                    class="text-[0.78rem] text-[var(--cl-teal)]!"
-                    :tabindex="5"
-                >
-                    Forgot your password?
-                </TextLink>
+
             </div>
             <PasswordInput
                 id="password"
@@ -134,10 +124,8 @@ defineProps<{
     <div
         class="mt-[1.4rem] text-center text-[0.8rem] text-[var(--cl-ink-faint)]"
     >
-        Don't have an account?
-        <TextLink :href="register()" class="text-[var(--cl-teal)]!" :tabindex="5">
-            Sign up
-        </TextLink>
+        Forgot your password? Ask your facility IT administrator.
+
     </div>
 
     <div
