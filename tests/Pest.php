@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Encounter;
+use App\Models\QueueEntry;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +47,13 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Open the console screen for a queue entry as the given staff member and
+ * return the encounter it started (or resumed).
+ */
+function openEncounter(QueueEntry $entry, User $actor, string $console = 'clinical.consult'): Encounter
 {
-    // ..
+    \Pest\Laravel\actingAs($actor)->get(route($console, $entry))->assertRedirect();
+
+    return Encounter::where('queue_entry_id', $entry->id)->firstOrFail();
 }

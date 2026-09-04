@@ -2,6 +2,7 @@ export type User = {
     id: number;
     name: string;
     email: string;
+    username: string | null;
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
@@ -10,8 +11,36 @@ export type User = {
     [key: string]: unknown;
 };
 
+export type NavModule = {
+    name: string;
+    slug: string;
+    icon: string | null;
+    href: string;
+};
+
 export type Auth = {
     user: User;
+    roles: string[];
+    modules: NavModule[];
+};
+
+/** The facility profile captured by the first-run wizard. */
+export type FacilityProfile = {
+    name: string | null;
+    state: string | null;
+    lga: string | null;
+    code: string | null;
+    /** A notice shown to every member of staff on the home screen. */
+    notice: string | null;
+    completed_at: string | null;
+};
+
+export type SharedData = {
+    name: string;
+    auth: Auth;
+    facility: FacilityProfile;
+    sidebarOpen: boolean;
+    [key: string]: unknown;
 };
 
 /* @chisel-passkeys */

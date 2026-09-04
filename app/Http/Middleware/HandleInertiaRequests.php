@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\FacilitySettings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -15,6 +16,8 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    public function __construct(private readonly FacilitySettings $facility) {}
 
     /**
      * Determines the current asset version.
@@ -35,11 +38,25 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'facility' => $this->facility->profile(),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
+                'roles' => $user
+                    ? $user->roles->pluck('slug')->all()
+                    : [],
+                'modules' => $user
+                    ? $user->accessibleModules()->map(fn ($module) => [
+                        'name' => $module->name,
+                        'slug' => $module->slug,
+                        'icon' => $module->icon,
+                        'href' => $module->link(),
+                    ])->values()
+                    : [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
