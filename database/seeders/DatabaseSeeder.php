@@ -17,6 +17,13 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndModulesSeeder::class,
             ServicePointsSeeder::class,
+            ServiceChargesSeeder::class,
+            WardsSeeder::class,
+            PayersSeeder::class,
+            IcdCodesSeeder::class,
+            NotifiableDiseasesSeeder::class,
+            LabCompendiumSeeder::class,
+            PharmacyStockSeeder::class,
             SuperAdminSeeder::class,
         ]);
     }

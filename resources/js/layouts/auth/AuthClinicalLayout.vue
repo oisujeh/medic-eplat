@@ -79,7 +79,7 @@
             <div
                 class="relative z-10 font-[family-name:var(--cl-font-mono)] text-[0.72rem] text-[rgba(225,235,238,0.4)]"
             >
-                LAGOS GENERAL · NODE-04 · LAST SYNCED 09:14
+                {{ facilityLine }}
             </div>
         </div>
 
@@ -94,6 +94,27 @@
 </template>
 
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import type { SharedData } from '@/types';
+
+const page = usePage<SharedData>();
+
+// The footer names the facility this installation serves, once it has been
+// set up.
+const facilityLine = computed(() => {
+    const facility = page.props.facility;
+
+    if (!facility?.name) {
+        return 'FACILITY NOT YET SET UP';
+    }
+
+    return [facility.name, facility.lga, facility.state]
+        .filter(Boolean)
+        .join(' · ')
+        .toUpperCase();
+});
+
 const vitals = [
     { label: 'Admitted today', value: '47', trend: '↑ 12%' },
     { label: 'Bed occupancy', value: '82', unit: '%' },

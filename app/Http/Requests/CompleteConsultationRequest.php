@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\Priority;
+use App\Http\Requests\Concerns\ClinicalDocumentationRules;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -10,6 +11,8 @@ use Illuminate\Validation\Rules\Enum;
 
 class CompleteConsultationRequest extends FormRequest
 {
+    use ClinicalDocumentationRules;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -32,6 +35,9 @@ class CompleteConsultationRequest extends FormRequest
             'examination' => ['nullable', 'string', 'max:10000'],
             'diagnosis' => ['required', 'string', 'max:5000'],
             'plan' => ['nullable', 'string', 'max:10000'],
+
+            // Structured stage data + outcome / follow-up
+            ...$this->structuredRules(),
 
             // Disposition (optional onward routing)
             'next_service_point_id' => ['nullable', Rule::exists('service_points', 'id')->where('is_active', true)],

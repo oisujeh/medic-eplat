@@ -54,43 +54,68 @@ class RolesAndModulesSeeder extends Seeder
             'roles' => ['chief-medical-director', 'physician', 'nurse', 'records-officer', 'laboratory-staff', 'pharmacy-staff', 'cashier'],
         ],
         [
+            'slug' => 'appointments', 'name' => 'Appointments', 'icon' => 'CalendarDays',
+            'href' => '/appointments', 'sort_order' => 19,
+            'roles' => ['chief-medical-director', 'physician', 'nurse', 'records-officer'],
+        ],
+        [
             'slug' => 'clinical', 'name' => 'Clinical', 'icon' => 'Stethoscope',
             'href' => '/clinical', 'sort_order' => 20,
             'roles' => ['chief-medical-director', 'physician'],
         ],
         [
             'slug' => 'nursing', 'name' => 'Nursing / Ward', 'icon' => 'HeartPulse',
-            'sort_order' => 30,
+            'href' => '/nursing', 'sort_order' => 30,
             'roles' => ['nurse'],
         ],
         [
+            'slug' => 'maternity', 'name' => 'Maternity', 'icon' => 'Baby',
+            'href' => '/maternity', 'sort_order' => 33,
+            'roles' => ['chief-medical-director', 'physician', 'nurse', 'records-officer'],
+        ],
+        [
+            'slug' => 'surveillance', 'name' => 'Case Surveillance', 'icon' => 'Radar',
+            'href' => '/surveillance', 'sort_order' => 34,
+            'roles' => ['chief-medical-director', 'physician', 'nurse', 'records-officer'],
+        ],
+        [
+            'slug' => 'admissions', 'name' => 'Admissions / Wards', 'icon' => 'BedDouble',
+            'href' => '/admissions', 'sort_order' => 35,
+            'roles' => ['chief-medical-director', 'physician', 'nurse', 'records-officer'],
+        ],
+        [
             'slug' => 'laboratory', 'name' => 'Laboratory', 'icon' => 'FlaskConical',
-            'sort_order' => 40,
+            'href' => '/laboratory', 'sort_order' => 40,
             'roles' => ['chief-medical-director', 'physician', 'laboratory-staff'],
         ],
         [
             'slug' => 'pharmacy', 'name' => 'Pharmacy', 'icon' => 'Pill',
-            'sort_order' => 50,
+            'href' => '/pharmacy', 'sort_order' => 50,
             'roles' => ['chief-medical-director', 'physician', 'nurse', 'pharmacy-staff'],
         ],
         [
             'slug' => 'inventory', 'name' => 'Inventory / Store', 'icon' => 'Package',
-            'sort_order' => 60,
-            'roles' => ['chief-medical-director', 'inventory-officer'],
+            'href' => '/inventory', 'sort_order' => 60,
+            'roles' => ['chief-medical-director', 'inventory-officer', 'pharmacy-staff'],
         ],
         [
             'slug' => 'billing', 'name' => 'Billing / Cashier', 'icon' => 'ReceiptText',
-            'sort_order' => 70,
+            'href' => '/billing', 'sort_order' => 70,
             'roles' => ['chief-medical-director', 'cashier'],
         ],
         [
+            'slug' => 'claims', 'name' => 'HMO / NHIA Claims', 'icon' => 'HandCoins',
+            'href' => '/claims', 'sort_order' => 75,
+            'roles' => ['chief-medical-director', 'cashier', 'records-officer'],
+        ],
+        [
             'slug' => 'reports', 'name' => 'Reports', 'icon' => 'ChartColumn',
-            'sort_order' => 80,
+            'href' => '/reports', 'sort_order' => 80,
             'roles' => ['chief-medical-director'],
         ],
         [
             'slug' => 'administration', 'name' => 'Administration', 'icon' => 'ShieldCheck',
-            'sort_order' => 90,
+            'href' => '/admin/users', 'sort_order' => 90,
             'roles' => [],
         ],
     ];

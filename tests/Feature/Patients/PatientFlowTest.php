@@ -87,20 +87,27 @@ test('staff without the queues module cannot route', function () {
         ->assertForbidden();
 });
 
-test('only staff of a service point can view its worklist', function () {
+test('a queue can be managed by its own staff and by all-module roles', function () {
     // Triage is governed by the nursing module.
     actingAs(flowUser(['nurse']))
         ->get(route('queues.show', 'triage'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->component('queues/Show'));
+        ->assertInertia(fn ($page) => $page
+            ->component('queues/Show')
+            ->where('servicePoint.console_url', '/nursing')
+        );
 
-    // A records officer has the queues module but not nursing.
+    actingAs(flowUser(['super-administrator']))
+        ->get(route('queues.show', 'triage'))
+        ->assertOk();
+
+    // Records staff route patients but do not manage other points' queues.
     actingAs(flowUser(['records-officer']))
         ->get(route('queues.show', 'triage'))
         ->assertForbidden();
 });
 
-test('a nurse can call a waiting patient', function () {
+test('a queue entry can be reassigned to eligible staff or returned to the pool', function () {
     $patient = Patient::factory()->create();
     actingAs(flowUser(['records-officer']))->post(route('patients.route', $patient), [
         'service_point_id' => servicePoint('triage')->id,
@@ -108,54 +115,77 @@ test('a nurse can call a waiting patient', function () {
     ]);
 
     $nurse = flowUser(['nurse']);
+    $charge = flowUser(['nurse']);
     $entry = QueueEntry::first();
 
-    actingAs($nurse)->post(route('queue-entries.call', $entry))->assertRedirect();
+    actingAs($charge)->patch(route('queue-entries.assign', $entry), ['assigned_to' => $nurse->id])
+        ->assertRedirect()->assertSessionHasNoErrors();
+    expect($entry->fresh()->assigned_to)->toBe($nurse->id);
 
-    $entry->refresh();
-    expect($entry->status)->toBe(QueueStatus::InService);
-    expect($entry->assigned_to)->toBe($nurse->id);
-    expect($entry->started_at)->not->toBeNull();
+    // A cashier does not work triage.
+    actingAs($charge)->patch(route('queue-entries.assign', $entry), ['assigned_to' => flowUser(['cashier'])->id])
+        ->assertSessionHasErrors('assigned_to');
+
+    actingAs($charge)->patch(route('queue-entries.assign', $entry), ['assigned_to' => null])
+        ->assertRedirect()->assertSessionHasNoErrors();
+    expect($entry->fresh()->assigned_to)->toBeNull();
+
+    // Records staff cannot manage a nursing queue.
+    actingAs(flowUser(['records-officer']))
+        ->patch(route('queue-entries.assign', $entry), ['assigned_to' => null])
+        ->assertForbidden();
 });
 
-test('completing an entry can route the patient onward', function () {
+test('a misrouted entry can be re-routed to another service point', function () {
     $patient = Patient::factory()->create();
     actingAs(flowUser(['records-officer']))->post(route('patients.route', $patient), [
         'service_point_id' => servicePoint('triage')->id,
         'priority' => 'normal',
     ]);
 
-    $nurse = flowUser(['nurse']);
     $entry = QueueEntry::first();
-    actingAs($nurse)->post(route('queue-entries.call', $entry));
 
-    actingAs($nurse)->post(route('queue-entries.complete', $entry), [
-        'next_service_point_id' => servicePoint('consultation')->id,
-        'next_priority' => 'urgent',
-        'next_note' => 'For review',
-    ])->assertRedirect();
+    actingAs(flowUser(['nurse']))->post(route('queue-entries.reroute', $entry), [
+        'service_point_id' => servicePoint('consultation')->id,
+        'priority' => 'urgent',
+        'note' => 'Booked straight to clinic',
+    ])->assertRedirect()->assertSessionHasNoErrors();
 
     $entry->refresh();
-    expect($entry->status)->toBe(QueueStatus::Completed);
-    expect($entry->completed_at)->not->toBeNull();
+    expect($entry->status)->toBe(QueueStatus::Cancelled)
+        ->and($entry->note)->toContain('Re-routed to General Consultation');
 
     $onward = QueueEntry::where('service_point_id', servicePoint('consultation')->id)->first();
     expect($onward)->not->toBeNull();
     expect($onward->status)->toBe(QueueStatus::Waiting);
+    expect($onward->priority->value)->toBe('urgent');
     expect($onward->visit_id)->toBe($entry->visit_id);
 });
 
-test('a nurse cannot act on another service point queue entry', function () {
+test('staff outside a service point cannot manage its entries', function () {
     $patient = Patient::factory()->create();
     actingAs(flowUser(['records-officer']))->post(route('patients.route', $patient), [
         'service_point_id' => servicePoint('laboratory')->id,
         'priority' => 'normal',
     ]);
 
-    // Nurse has nursing, not laboratory — cannot call a lab queue entry.
+    // Nurse has nursing, not laboratory.
     actingAs(flowUser(['nurse']))
-        ->post(route('queue-entries.call', QueueEntry::first()))
+        ->post(route('queue-entries.cancel', QueueEntry::first()))
         ->assertForbidden();
+});
+
+test('a patient cannot be completed from the queue without documentation', function () {
+    $patient = Patient::factory()->create();
+    actingAs(flowUser(['records-officer']))->post(route('patients.route', $patient), [
+        'service_point_id' => servicePoint('consultation')->id,
+        'priority' => 'normal',
+    ]);
+
+    // The old shortcut is gone; sign-off lives on the encounter.
+    actingAs(flowUser(['physician']))
+        ->post('/queue-entries/'.QueueEntry::first()->id.'/complete')
+        ->assertNotFound();
 });
 
 test('closing a visit cancels active entries', function () {

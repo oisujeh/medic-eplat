@@ -27,6 +27,7 @@ const props = defineProps<{
         nokRelationships: string[];
         coverages: Record<string, string>;
         hmoProviders: string[];
+        payers: Array<{ id: number; name: string; type_label: string }>;
         visitCategories: string[];
         outpatientServices: string[];
     };
@@ -66,8 +67,11 @@ const form = useForm({
     next_of_kin_relationship: '',
     next_of_kin_phone: '',
     coverage: 'private',
+    payer_id: '',
     hmo_name: '',
     hmo_number: '',
+    hmo_plan: '',
+    hmo_expires_at: '',
     is_transfer: false,
     transfer_from: '',
     transfer_reason: '',
@@ -96,30 +100,52 @@ watch(
 );
 
 const isHmo = computed(() => form.coverage === 'hmo');
+
+// Payers registered under Claims are preferred; the free-text provider list
+// remains for a facility that has not set any up yet.
+const hasPayers = computed(() => props.options.payers.length > 0);
+
+watch(
+    () => form.payer_id,
+    (id) => {
+        const payer = props.options.payers.find((p) => String(p.id) === id);
+
+        if (payer) {
+            form.hmo_name = payer.name;
+        }
+    },
+);
 const isOutpatient = computed(() => form.visit_category === 'Outpatient');
 const isOtherService = computed(
     () => isOutpatient.value && form.outpatient_service === 'Other',
 );
 
 function submit() {
-    form
-        .transform((data) => ({
-            ...data,
-            hmo_name: data.coverage === 'hmo' ? data.hmo_name : '',
-            hmo_number: data.coverage === 'hmo' ? data.hmo_number : '',
-            transfer_from: data.is_transfer ? data.transfer_from : '',
-            transfer_reason: data.is_transfer ? data.transfer_reason : '',
-            transfer_service: data.is_transfer ? data.transfer_service : '',
-            outpatient_service: !isOutpatient.value
-                ? ''
-                : data.outpatient_service === 'Other'
-                  ? data.outpatient_service_other
-                  : data.outpatient_service,
-        }))
-        .post('/registration', {
-            preserveScroll: true,
-            onSuccess: () => form.reset(),
-        });
+    form.transform((data) => ({
+        ...data,
+        payer_id:
+            data.coverage === 'hmo' && data.payer_id
+                ? Number(data.payer_id)
+                : null,
+        hmo_name: data.coverage === 'hmo' ? data.hmo_name : '',
+        hmo_number: data.coverage === 'hmo' ? data.hmo_number : '',
+        hmo_plan: data.coverage === 'hmo' ? data.hmo_plan : '',
+        hmo_expires_at:
+            data.coverage === 'hmo' && data.hmo_expires_at
+                ? data.hmo_expires_at
+                : null,
+        transfer_from: data.is_transfer ? data.transfer_from : '',
+        transfer_reason: data.is_transfer ? data.transfer_reason : '',
+        transfer_service: data.is_transfer ? data.transfer_service : '',
+        outpatient_service: !isOutpatient.value
+            ? ''
+            : data.outpatient_service === 'Other'
+              ? data.outpatient_service_other
+              : data.outpatient_service,
+    })).post('/registration', {
+        preserveScroll: true,
+        onSuccess: () => form.reset(),
+    });
 }
 </script>
 
@@ -134,8 +160,8 @@ function submit() {
                 </h1>
                 <p class="mt-1 max-w-2xl text-sm text-muted-foreground">
                     Records Unit — demographics &amp; visit routing only. Do not
-                    enter clinical notes or assessment here; that is completed by
-                    the receiving service after routing.
+                    enter clinical notes or assessment here; that is completed
+                    by the receiving service after routing.
                 </p>
             </div>
             <span
@@ -147,7 +173,10 @@ function submit() {
         </div>
 
         <div class="grid gap-6 lg:grid-cols-[1fr_20rem]">
-            <form class="flex flex-1 flex-col gap-6 p-4" @submit.prevent="submit">
+            <form
+                class="flex flex-1 flex-col gap-6 p-4"
+                @submit.prevent="submit"
+            >
                 <!-- Patient identity -->
                 <section class="rounded-xl border border-border bg-card p-5">
                     <h2 class="mb-4 text-sm font-semibold text-foreground">
@@ -236,7 +265,10 @@ function submit() {
                         <div class="grid gap-1.5">
                             <Label for="marital_status">Marital status</Label>
                             <Select v-model="form.marital_status">
-                                <SelectTrigger id="marital_status" class="w-full">
+                                <SelectTrigger
+                                    id="marital_status"
+                                    class="w-full"
+                                >
                                     <SelectValue placeholder="Select" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -302,7 +334,6 @@ function submit() {
                             />
                             <InputError :message="form.errors.address" />
                         </div>
-
 
                         <div class="grid gap-1.5">
                             <Label for="state">State of residence *</Label>
@@ -414,7 +445,9 @@ function submit() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem
-                                        v-for="(label, value) in options.coverages"
+                                        v-for="(
+                                            label, value
+                                        ) in options.coverages"
                                         :key="value"
                                         :value="value"
                                         >{{ label }}</SelectItem
@@ -424,11 +457,38 @@ function submit() {
                             <InputError :message="form.errors.coverage" />
                         </div>
 
-                        <div v-if="isHmo" class="grid gap-1.5">
+                        <div v-if="isHmo && hasPayers" class="grid gap-1.5">
+                            <Label for="payer_id">HMO / scheme *</Label>
+                            <Select v-model="form.payer_id">
+                                <SelectTrigger id="payer_id" class="w-full">
+                                    <SelectValue placeholder="Select payer" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="p in options.payers"
+                                        :key="p.id"
+                                        :value="String(p.id)"
+                                        >{{ p.name }}
+                                        <span class="text-muted-foreground"
+                                            >· {{ p.type_label }}</span
+                                        ></SelectItem
+                                    >
+                                </SelectContent>
+                            </Select>
+                            <InputError
+                                :message="
+                                    form.errors.payer_id ?? form.errors.hmo_name
+                                "
+                            />
+                        </div>
+
+                        <div v-else-if="isHmo" class="grid gap-1.5">
                             <Label for="hmo_name">HMO / provider *</Label>
                             <Select v-model="form.hmo_name">
                                 <SelectTrigger id="hmo_name" class="w-full">
-                                    <SelectValue placeholder="Select provider" />
+                                    <SelectValue
+                                        placeholder="Select provider"
+                                    />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem
@@ -443,13 +503,36 @@ function submit() {
                         </div>
 
                         <div v-if="isHmo" class="grid gap-1.5">
-                            <Label for="hmo_number">HMO / enrollee number</Label>
+                            <Label for="hmo_number">Enrollee number</Label>
                             <Input
                                 id="hmo_number"
                                 v-model="form.hmo_number"
                                 autocomplete="off"
                             />
                             <InputError :message="form.errors.hmo_number" />
+                        </div>
+
+                        <div v-if="isHmo" class="grid gap-1.5">
+                            <Label for="hmo_plan">Plan / scheme</Label>
+                            <Input
+                                id="hmo_plan"
+                                v-model="form.hmo_plan"
+                                autocomplete="off"
+                                placeholder="e.g. Formal sector, Gold"
+                            />
+                            <InputError :message="form.errors.hmo_plan" />
+                        </div>
+
+                        <div v-if="isHmo" class="grid gap-1.5">
+                            <Label for="hmo_expires_at"
+                                >Enrolment expires</Label
+                            >
+                            <Input
+                                id="hmo_expires_at"
+                                v-model="form.hmo_expires_at"
+                                type="date"
+                            />
+                            <InputError :message="form.errors.hmo_expires_at" />
                         </div>
                     </div>
                 </section>
@@ -481,7 +564,9 @@ function submit() {
                         </div>
 
                         <div class="grid gap-1.5">
-                            <Label for="transfer_reason">Reason for transfer</Label>
+                            <Label for="transfer_reason"
+                                >Reason for transfer</Label
+                            >
                             <Input
                                 id="transfer_reason"
                                 v-model="form.transfer_reason"
@@ -518,7 +603,10 @@ function submit() {
                         <div class="grid gap-1.5">
                             <Label for="visit_category">Visit category *</Label>
                             <Select v-model="form.visit_category">
-                                <SelectTrigger id="visit_category" class="w-full">
+                                <SelectTrigger
+                                    id="visit_category"
+                                    class="w-full"
+                                >
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -592,7 +680,7 @@ function submit() {
             </form>
 
             <!-- Recently registered -->
-<!--            <aside class="flex flex-col gap-4">
+            <!--            <aside class="flex flex-col gap-4">
                 <div class="rounded-xl border border-border bg-card p-5">
                     <h2
                         class="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground"

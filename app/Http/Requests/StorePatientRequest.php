@@ -64,8 +64,17 @@ class StorePatientRequest extends FormRequest
             'next_of_kin_phone' => ['nullable', 'string', 'max:30'],
 
             'coverage' => ['required', Rule::in(array_keys(PatientOptions::COVERAGES))],
-            'hmo_name' => ['nullable', 'required_if:coverage,hmo', 'string', 'max:150'],
+            // A payer on record supplies the provider name; otherwise it is typed.
+            'payer_id' => ['nullable', Rule::exists('payers', 'id')->where('is_active', true)],
+            'hmo_name' => [
+                'nullable',
+                Rule::requiredIf(fn () => $this->input('coverage') === 'hmo' && ! $this->filled('payer_id')),
+                'string',
+                'max:150',
+            ],
             'hmo_number' => ['nullable', 'string', 'max:100'],
+            'hmo_plan' => ['nullable', 'string', 'max:100'],
+            'hmo_expires_at' => ['nullable', 'date'],
 
             'is_transfer' => ['boolean'],
             'transfer_from' => ['nullable', 'required_if:is_transfer,true', 'string', 'max:200'],
@@ -85,7 +94,7 @@ class StorePatientRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'hmo_name.required_if' => 'Please select the HMO / provider for HMO-covered patients.',
+            'hmo_name.required' => 'Please select the HMO / provider for HMO-covered patients.',
             'transfer_from.required_if' => 'Please enter the facility the patient is transferred from.',
             'outpatient_service.required_if' => 'Please select the outpatient service point.',
         ];

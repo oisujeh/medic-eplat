@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\ServicePointFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -23,6 +25,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['name', 'slug', 'description', 'icon', 'module_slug', 'captures_vitals', 'sort_order', 'is_active'])]
 class ServicePoint extends Model
 {
+    /** @use HasFactory<ServicePointFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -60,6 +65,7 @@ class ServicePoint extends Model
         }
 
         return User::query()
+            ->active()
             ->whereHas('roles.modules', fn (Builder $q) => $q->where('modules.slug', $this->module_slug))
             ->orderBy('name')
             ->get(['id', 'name']);

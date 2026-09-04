@@ -2,32 +2,35 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Contracts\Validation\ValidationRule;
+use App\Http\Requests\Concerns\EncounterDocumentationRules;
+use App\Models\Encounter;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SaveEncounterRequest extends FormRequest
 {
+    use EncounterDocumentationRules;
+
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        return (bool) $this->user()?->can('document', $this->encounter());
     }
 
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, array<int, ValidationRule|string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
-        return [
-            'presenting_complaint' => ['nullable', 'string', 'max:5000'],
-            'history' => ['nullable', 'string', 'max:10000'],
-            'examination' => ['nullable', 'string', 'max:10000'],
-            'diagnosis' => ['nullable', 'string', 'max:5000'],
-            'plan' => ['nullable', 'string', 'max:10000'],
-        ];
+        return $this->documentationRules($this->encounter()->type);
+    }
+
+    public function encounter(): Encounter
+    {
+        /** @var Encounter */
+        return $this->route('encounter');
     }
 }

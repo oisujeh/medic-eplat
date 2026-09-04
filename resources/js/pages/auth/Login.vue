@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import InputError from '@/components/InputError.vue';
 import PasskeyVerify from '@/components/PasskeyVerify.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
@@ -10,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthClinicalLayout from '@/layouts/auth/AuthClinicalLayout.vue';
 import { store } from '@/routes/login';
+import type { SharedData } from '@/types';
 
 defineOptions({ layout: AuthClinicalLayout });
 
@@ -17,6 +19,11 @@ defineProps<{
     status?: string;
     canResetPassword: boolean;
 }>();
+
+const page = usePage<SharedData>();
+const facilityCode = computed(
+    () => page.props.facility?.code ?? 'Facility not yet set up',
+);
 </script>
 
 <template>
@@ -26,7 +33,7 @@ defineProps<{
         class="mb-[1.8rem] flex justify-between border-b border-[var(--cl-line)] pb-[0.9rem] font-[family-name:var(--cl-font-mono)] text-[0.68rem] tracking-[0.12em] text-[var(--cl-ink-faint)] uppercase"
     >
         <span>Staff access</span>
-        <span>Facility 04A</span>
+        <span>{{ facilityCode }}</span>
     </div>
 
     <h2
@@ -82,7 +89,6 @@ defineProps<{
                 >
                     Password
                 </Label>
-
             </div>
             <PasswordInput
                 id="password"
@@ -125,7 +131,6 @@ defineProps<{
         class="mt-[1.4rem] text-center text-[0.8rem] text-[var(--cl-ink-faint)]"
     >
         Forgot your password? Ask your facility IT administrator.
-
     </div>
 
     <div

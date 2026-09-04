@@ -3,10 +3,15 @@
 namespace App\Models;
 
 use App\Enums\VisitStatus;
+use App\Models\Concerns\Auditable;
+use App\Models\Contracts\AuditableRecord;
+use Database\Factories\VisitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,8 +26,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $closed_at
  */
 #[Fillable(['visit_number', 'patient_id', 'status', 'reason', 'opened_by', 'closed_by', 'opened_at', 'closed_at'])]
-class Visit extends Model
+class Visit extends Model implements AuditableRecord
 {
+    /** @use HasFactory<VisitFactory> */
+    use Auditable, HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -68,13 +76,33 @@ class Visit extends Model
     }
 
     /**
-     * Vitals/anthropometric readings recorded during this visit.
+     * Observation sets recorded during this visit, newest first.
      *
-     * @return HasMany<VitalSign, $this>
+     * @return HasMany<ObservationSet, $this>
      */
-    public function vitalSigns(): HasMany
+    public function observationSets(): HasMany
     {
-        return $this->hasMany(VitalSign::class)->latest('recorded_at');
+        return $this->hasMany(ObservationSet::class)->latest('recorded_at')->latest('id');
+    }
+
+    /**
+     * The most recent observation set of the visit.
+     *
+     * @return HasOne<ObservationSet, $this>
+     */
+    public function latestObservationSet(): HasOne
+    {
+        return $this->hasOne(ObservationSet::class)->latestOfMany('recorded_at');
+    }
+
+    /**
+     * Clinical encounters held during this visit, oldest first.
+     *
+     * @return HasMany<Encounter, $this>
+     */
+    public function encounters(): HasMany
+    {
+        return $this->hasMany(Encounter::class)->orderBy('started_at');
     }
 
     /**

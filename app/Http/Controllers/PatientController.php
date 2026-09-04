@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Priority;
+use App\Http\Resources\EncounterSummaryResource;
+use App\Http\Resources\ObservationSetResource;
 use App\Models\Patient;
 use App\Models\QueueEntry;
 use App\Models\ServicePoint;
-use App\Models\Visit;
 use App\Support\PatientOptions;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -63,6 +64,7 @@ class PatientController extends Controller
     public function show(Request $request, Patient $patient): Response
     {
         $patient->load('registeredBy:id,name');
+        $user = $request->user();
 
         return Inertia::render('patients/Show', [
             'patient' => [
@@ -93,6 +95,10 @@ class PatientController extends Controller
                 'coverage_label' => PatientOptions::COVERAGES[$patient->coverage] ?? $patient->coverage,
                 'hmo_name' => $patient->hmo_name,
                 'hmo_number' => $patient->hmo_number,
+                'payer' => $patient->payer?->name,
+                'hmo_plan' => $patient->hmo_plan,
+                'hmo_expires_at' => $patient->hmo_expires_at?->isoFormat('D MMM YYYY'),
+                'hmo_expired' => $patient->hmo_expires_at?->isPast() ?? false,
                 'is_transfer' => $patient->is_transfer,
                 'transfer_from' => $patient->transfer_from,
                 'transfer_reason' => $patient->transfer_reason,
@@ -104,20 +110,17 @@ class PatientController extends Controller
                 'registered_at_diff' => $patient->created_at?->diffForHumans(),
             ],
             'openVisit' => $this->presentOpenVisit($patient),
-            'vitals' => $patient->vitalSigns()->with('recordedBy:id,name')->take(10)->get()
-                ->map(fn ($vital) => $vital->summary()),
-            'encounters' => $patient->encounters()->with('clinician:id,name')->take(20)->get()
-                ->map(fn ($e) => [
-                    'id' => $e->id,
-                    'presenting_complaint' => $e->presenting_complaint,
-                    'history' => $e->history,
-                    'examination' => $e->examination,
-                    'diagnosis' => $e->diagnosis,
-                    'plan' => $e->plan,
-                    'status' => $e->status,
-                    'clinician' => $e->clinician?->name,
-                    'date' => ($e->completed_at ?? $e->created_at)?->isoFormat('D MMM YYYY, h:mm a'),
-                ]),
+            'activeAdmission' => $this->presentActiveAdmission($patient),
+            'activePregnancy' => $this->presentActivePregnancy($patient),
+            'canBookPregnancy' => $patient->sex === 'F' && (bool) $user?->canAccessModule('maternity'),
+            'canAdmit' => (bool) $user?->canAccessModule('admissions'),
+            'canEdit' => (bool) $user?->canAccessModule('registration'),
+            'observationSets' => ObservationSetResource::collection(
+                $patient->observationSets()->with('observations', 'recordedBy:id,name')->take(12)->get(),
+            ),
+            'encounters' => EncounterSummaryResource::collection(
+                $patient->encounters()->with(['author:id,name', 'servicePoint:id,name', 'codedDiagnoses', 'addenda.author:id,name'])->take(30)->get(),
+            ),
             'servicePoints' => ServicePoint::active()->get()
                 ->map(fn (ServicePoint $sp) => [
                     'id' => $sp->id,
@@ -133,8 +136,63 @@ class PatientController extends Controller
                 ]),
                 'visitReasons' => PatientOptions::VISIT_REASONS,
             ],
-            'canRoute' => (bool) $request->user()?->canAccessModule('queues'),
+            'canRoute' => (bool) $user?->canAccessModule('queues'),
+            'canBook' => (bool) $user?->canAccessModule('appointments'),
         ]);
+    }
+
+    /**
+     * The patient's pregnancy under antenatal care, for the profile banner.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function presentActivePregnancy(Patient $patient): ?array
+    {
+        $pregnancy = $patient->activePregnancy();
+
+        if (! $pregnancy) {
+            return null;
+        }
+
+        return [
+            'id' => $pregnancy->id,
+            'pregnancy_number' => $pregnancy->pregnancy_number,
+            'edd' => $pregnancy->edd?->isoFormat('D MMM YYYY'),
+            'ga_weeks' => $pregnancy->gestationalAgeWeeks(),
+            'overdue' => $pregnancy->isOverdue(),
+            'risk_factors' => $pregnancy->risk_factors ?? [],
+            'url' => route('maternity.show', $pregnancy),
+        ];
+    }
+
+    /**
+     * The patient's current inpatient episode, for the profile banner.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function presentActiveAdmission(Patient $patient): ?array
+    {
+        $admission = $patient->activeAdmission();
+
+        if (! $admission) {
+            return null;
+        }
+
+        $admission->load(['ward:id,name', 'bed:id,label', 'attending:id,name']);
+
+        return [
+            'id' => $admission->id,
+            'admission_number' => $admission->admission_number,
+            'status' => $admission->status->value,
+            'status_label' => $admission->status->label(),
+            'ward' => $admission->ward?->name,
+            'bed' => $admission->bed?->label,
+            'attending' => $admission->attending?->name,
+            'diagnosis' => $admission->admitting_diagnosis,
+            'admitted_diff' => $admission->admitted_at?->diffForHumans(),
+            'days' => $admission->lengthOfStayDays(),
+            'url' => route('admissions.show', $admission),
+        ];
     }
 
     /**

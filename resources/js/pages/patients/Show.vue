@@ -3,6 +3,10 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     Activity,
     ArrowLeft,
+    Baby,
+    BedDouble,
+    CalendarPlus,
+    Pencil,
     CircleDot,
     Send,
     Stethoscope,
@@ -10,8 +14,11 @@ import {
     Waypoints,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
+import EncounterTimeline from '@/components/encounter/EncounterTimeline.vue';
 import InputError from '@/components/InputError.vue';
-import VitalsTrends from '@/components/VitalsTrends.vue';
+import ObservationChips from '@/components/observations/ObservationChips.vue';
+import ObservationHistory from '@/components/observations/ObservationHistory.vue';
+import ObservationTrends from '@/components/observations/ObservationTrends.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +30,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { type Vitals, alertBadge, chipClass, vitalsChips } from '@/lib/vitals';
+import type { EncounterSummary, ObservationSet } from '@/types/clinical';
 
 type Patient = {
     id: number;
@@ -53,6 +60,10 @@ type Patient = {
     coverage_label: string;
     hmo_name: string | null;
     hmo_number: string | null;
+    payer: string | null;
+    hmo_plan: string | null;
+    hmo_expires_at: string | null;
+    hmo_expired: boolean;
     is_transfer: boolean;
     transfer_from: string | null;
     transfer_reason: string | null;
@@ -88,23 +99,38 @@ type OpenVisit = {
     entries: QueueEntry[];
 };
 
-type Encounter = {
+type ActiveAdmission = {
     id: number;
-    presenting_complaint: string | null;
-    history: string | null;
-    examination: string | null;
-    diagnosis: string | null;
-    plan: string | null;
+    admission_number: string;
     status: string;
-    clinician: string | null;
-    date: string | null;
+    status_label: string;
+    ward: string | null;
+    bed: string | null;
+    attending: string | null;
+    diagnosis: string;
+    admitted_diff: string | null;
+    days: number | null;
+    url: string;
 };
 
 const props = defineProps<{
     patient: Patient;
     openVisit: OpenVisit | null;
-    vitals: Vitals[];
-    encounters: Encounter[];
+    activeAdmission: ActiveAdmission | null;
+    activePregnancy: {
+        id: number;
+        pregnancy_number: string;
+        edd: string | null;
+        ga_weeks: number | null;
+        overdue: boolean;
+        risk_factors: string[];
+        url: string;
+    } | null;
+    canBookPregnancy: boolean;
+    canAdmit: boolean;
+    canEdit: boolean;
+    observationSets: ObservationSet[];
+    encounters: EncounterSummary[];
     servicePoints: Array<{
         id: number;
         name: string;
@@ -115,9 +141,12 @@ const props = defineProps<{
         visitReasons: string[];
     };
     canRoute: boolean;
+    canBook: boolean;
 }>();
 
-const latestVitals = computed<Vitals | null>(() => props.vitals[0] ?? null);
+const latestObservations = computed<ObservationSet | null>(
+    () => props.observationSets[0] ?? null,
+);
 
 defineOptions({
     layout: {
@@ -133,8 +162,12 @@ const activeTab = ref('overview');
 // The queue entry the patient is currently sitting at (waiting/in service),
 // used for the at-a-glance status on the Overview tab.
 const currentStage = computed<QueueEntry | null>(() => {
-    if (!props.openVisit) return null;
+    if (!props.openVisit) {
+        return null;
+    }
+
     const entries = props.openVisit.entries;
+
     return (
         [...entries]
             .reverse()
@@ -194,7 +227,10 @@ function submitRoute() {
 }
 
 function closeVisit() {
-    if (!props.openVisit) return;
+    if (!props.openVisit) {
+        return;
+    }
+
     router.post(
         `/visits/${props.openVisit.id}/close`,
         {},
@@ -203,10 +239,18 @@ function closeVisit() {
 }
 
 function statusClass(status: string): string {
-    if (status === 'in_service') return 'bg-primary/10 text-primary';
-    if (status === 'completed')
+    if (status === 'in_service') {
+        return 'bg-primary/10 text-primary';
+    }
+
+    if (status === 'completed') {
         return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400';
-    if (status === 'cancelled') return 'bg-muted text-muted-foreground line-through';
+    }
+
+    if (status === 'cancelled') {
+        return 'bg-muted text-muted-foreground line-through';
+    }
+
     return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
 }
 
@@ -243,8 +287,19 @@ const nextOfKin = computed<Field[]>(() => [
 
 const billing = computed<Field[]>(() => [
     { label: 'Coverage', value: props.patient.coverage_label },
-    { label: 'HMO / provider', value: props.patient.hmo_name },
+    {
+        label: 'HMO / provider',
+        value: props.patient.payer ?? props.patient.hmo_name,
+    },
     { label: 'Enrollee number', value: props.patient.hmo_number },
+    { label: 'Plan / scheme', value: props.patient.hmo_plan },
+    {
+        label: 'Enrolment expires',
+        value: props.patient.hmo_expires_at
+            ? props.patient.hmo_expires_at +
+              (props.patient.hmo_expired ? ' (expired)' : '')
+            : null,
+    },
 ]);
 
 const visit = computed<Field[]>(() => [
@@ -324,13 +379,75 @@ const visit = computed<Field[]>(() => [
             </div>
 
             <div class="flex flex-col items-end gap-2">
-                <div v-if="props.canRoute" class="flex gap-2">
-                    <Button size="sm" @click="startRouting">
+                <div
+                    v-if="
+                        props.canRoute ||
+                        props.canBook ||
+                        props.canAdmit ||
+                        props.canEdit
+                    "
+                    class="flex flex-wrap justify-end gap-2"
+                >
+                    <Button
+                        v-if="props.canEdit"
+                        as-child
+                        variant="outline"
+                        size="sm"
+                    >
+                        <Link :href="`/patients/${props.patient.id}/edit`">
+                            <Pencil class="size-4" />
+                            Edit
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="props.canBook"
+                        as-child
+                        variant="outline"
+                        size="sm"
+                    >
+                        <Link
+                            :href="`/appointments?patient_id=${props.patient.id}`"
+                        >
+                            <CalendarPlus class="size-4" />
+                            Book appointment
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="props.canBookPregnancy && !props.activePregnancy"
+                        as-child
+                        variant="outline"
+                        size="sm"
+                    >
+                        <Link
+                            :href="`/maternity?patient_id=${props.patient.id}`"
+                        >
+                            <Baby class="size-4" />
+                            Book ANC
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="props.canAdmit && !props.activeAdmission"
+                        as-child
+                        variant="outline"
+                        size="sm"
+                    >
+                        <Link
+                            :href="`/admissions?patient_id=${props.patient.id}`"
+                        >
+                            <BedDouble class="size-4" />
+                            Admit
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="props.canRoute"
+                        size="sm"
+                        @click="startRouting"
+                    >
                         <Send class="size-4" />
                         Send to service point
                     </Button>
                     <Button
-                        v-if="props.openVisit"
+                        v-if="props.canRoute && props.openVisit"
                         variant="outline"
                         size="sm"
                         @click="closeVisit"
@@ -349,6 +466,95 @@ const visit = computed<Field[]>(() => [
             </div>
         </div>
 
+        <!-- Antenatal banner -->
+        <div
+            v-if="props.activePregnancy"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-pink-500/30 bg-pink-500/5 px-4 py-3"
+        >
+            <div class="flex items-center gap-3">
+                <Baby class="size-5 text-pink-600" />
+                <div class="text-sm">
+                    <p class="font-medium">
+                        Antenatal care
+                        <span class="font-normal text-muted-foreground">
+                            · {{ props.activePregnancy.pregnancy_number }}
+                            <span
+                                v-if="props.activePregnancy.ga_weeks !== null"
+                            >
+                                ·
+                                {{ props.activePregnancy.ga_weeks }} weeks</span
+                            >
+                            <span v-if="props.activePregnancy.edd">
+                                · EDD {{ props.activePregnancy.edd }}</span
+                            >
+                        </span>
+                        <span
+                            v-if="props.activePregnancy.overdue"
+                            class="ml-1 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400"
+                            >Past EDD</span
+                        >
+                    </p>
+                    <p
+                        v-if="props.activePregnancy.risk_factors.length"
+                        class="text-xs text-muted-foreground"
+                    >
+                        Risk:
+                        {{ props.activePregnancy.risk_factors.join(', ') }}
+                    </p>
+                </div>
+            </div>
+            <Button as-child size="sm" variant="outline">
+                <Link :href="props.activePregnancy.url"
+                    >Open pregnancy record</Link
+                >
+            </Button>
+        </div>
+
+        <!-- Inpatient banner -->
+        <div
+            v-if="props.activeAdmission"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3"
+        >
+            <div class="flex items-center gap-3">
+                <BedDouble class="size-5 text-primary" />
+                <div class="text-sm">
+                    <p class="font-medium">
+                        {{
+                            props.activeAdmission.status === 'admitted'
+                                ? 'Inpatient'
+                                : 'Admission ordered'
+                        }}
+                        <span
+                            v-if="props.activeAdmission.ward"
+                            class="font-normal text-muted-foreground"
+                        >
+                            · {{ props.activeAdmission.ward
+                            }}<span v-if="props.activeAdmission.bed">
+                                · {{ props.activeAdmission.bed }}</span
+                            ></span
+                        >
+                        <span
+                            v-if="props.activeAdmission.days"
+                            class="font-normal text-muted-foreground"
+                        >
+                            · day {{ props.activeAdmission.days }}</span
+                        >
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                        {{ props.activeAdmission.diagnosis }}
+                        <span v-if="props.activeAdmission.attending">
+                            · {{ props.activeAdmission.attending }}</span
+                        >
+                    </p>
+                </div>
+            </div>
+            <Button as-child size="sm" variant="outline">
+                <Link :href="props.activeAdmission.url">
+                    Open inpatient record
+                </Link>
+            </Button>
+        </div>
+
         <Tabs v-model="activeTab">
             <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -358,7 +564,9 @@ const visit = computed<Field[]>(() => [
                 <TabsTrigger value="visit">
                     <Waypoints /> Visit &amp; routing
                 </TabsTrigger>
-                <TabsTrigger value="vitals"> <Activity /> Vitals </TabsTrigger>
+                <TabsTrigger value="observations">
+                    <Activity /> Observations
+                </TabsTrigger>
                 <TabsTrigger value="clinical">
                     <Stethoscope /> Clinical
                 </TabsTrigger>
@@ -380,7 +588,8 @@ const visit = computed<Field[]>(() => [
                                     <span class="font-mono">{{
                                         props.openVisit.visit_number
                                     }}</span>
-                                    · opened {{ props.openVisit.opened_at_diff }}
+                                    · opened
+                                    {{ props.openVisit.opened_at_diff }}
                                 </p>
                                 <div
                                     v-if="currentStage"
@@ -391,7 +600,9 @@ const visit = computed<Field[]>(() => [
                                     }}</span>
                                     <span
                                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                        :class="statusClass(currentStage.status)"
+                                        :class="
+                                            statusClass(currentStage.status)
+                                        "
                                         >{{ currentStage.status_label }}</span
                                     >
                                 </div>
@@ -403,10 +614,7 @@ const visit = computed<Field[]>(() => [
                                     View full timeline →
                                 </Button>
                             </div>
-                            <div
-                                v-else
-                                class="flex flex-col items-start gap-3"
-                            >
+                            <div v-else class="flex flex-col items-start gap-3">
                                 <p class="text-sm text-muted-foreground">
                                     No open visit.
                                 </p>
@@ -421,78 +629,36 @@ const visit = computed<Field[]>(() => [
                             </div>
                         </section>
 
-                        <!-- Latest vitals -->
+                        <!-- Latest observations -->
                         <section
                             class="rounded-xl border border-border bg-card p-5"
                         >
-                            <div class="flex items-center justify-between gap-2">
-                                <div class="flex items-center gap-2">
-                                    <h2 class="text-sm font-semibold">
-                                        Latest vitals
-                                    </h2>
-                                    <span
-                                        v-if="
-                                            latestVitals &&
-                                            alertBadge(latestVitals.alert_level)
-                                        "
-                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
-                                        :class="
-                                            alertBadge(latestVitals.alert_level)!
-                                                .class
-                                        "
-                                        >{{
-                                            alertBadge(latestVitals.alert_level)!
-                                                .label
-                                        }}</span
-                                    >
-                                </div>
+                            <div
+                                class="flex items-center justify-between gap-2"
+                            >
+                                <h2 class="text-sm font-semibold">
+                                    Latest observations
+                                </h2>
                                 <Button
-                                    v-if="props.vitals.length"
+                                    v-if="props.observationSets.length"
                                     variant="link"
                                     class="h-auto p-0 text-xs"
-                                    @click="activeTab = 'vitals'"
+                                    @click="activeTab = 'observations'"
                                 >
                                     View trends →
                                 </Button>
                             </div>
-                            <div
-                                v-if="latestVitals"
-                                class="mt-3 flex flex-wrap gap-2"
-                            >
-                                <span
-                                    v-for="chip in vitalsChips(latestVitals)"
-                                    :key="chip.label"
-                                    class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm"
-                                    :class="chipClass(chip.level)"
-                                    :title="chip.reason ?? undefined"
-                                >
-                                    <span
-                                        class="text-xs"
-                                        :class="
-                                            chip.level === 'normal'
-                                                ? 'text-muted-foreground'
-                                                : 'opacity-80'
-                                        "
-                                        >{{ chip.label }}</span
-                                    >
-                                    <span class="font-semibold">{{
-                                        chip.value
-                                    }}</span>
-                                </span>
+                            <div v-if="latestObservations" class="mt-3">
+                                <ObservationChips
+                                    :set="latestObservations"
+                                    size="sm"
+                                />
                             </div>
-                            <p v-else class="mt-2 text-sm text-muted-foreground">
-                                No vitals recorded yet.
-                            </p>
                             <p
-                                v-if="latestVitals && latestVitals.flags.length"
-                                class="mt-2 text-xs text-muted-foreground"
+                                v-else
+                                class="mt-2 text-sm text-muted-foreground"
                             >
-                                Flags:
-                                <span class="font-medium text-foreground">{{
-                                    latestVitals.flags
-                                        .map((f) => f.label)
-                                        .join(', ')
-                                }}</span>
+                                No observations recorded yet.
                             </p>
                         </section>
                     </div>
@@ -555,7 +721,8 @@ const visit = computed<Field[]>(() => [
                                     </dt>
                                     <dd class="text-sm">
                                         {{
-                                            props.patient.next_of_kin_name || '—'
+                                            props.patient.next_of_kin_name ||
+                                            '—'
                                         }}<span
                                             v-if="
                                                 props.patient
@@ -602,383 +769,394 @@ const visit = computed<Field[]>(() => [
                     </div>
 
                     <!-- Routing form -->
-            <div
-                v-if="showRouteForm && props.canRoute"
-                class="mt-4 grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-2"
-            >
-                <div class="grid gap-1.5">
-                    <Label>Service point *</Label>
-                    <Select v-model="routeForm.service_point_id">
-                        <SelectTrigger class="w-full bg-background">
-                            <SelectValue placeholder="Select destination" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="sp in props.servicePoints"
-                                :key="sp.id"
-                                :value="String(sp.id)"
-                                >{{ sp.name }}</SelectItem
-                            >
-                        </SelectContent>
-                    </Select>
-                    <InputError :message="routeForm.errors.service_point_id" />
-                </div>
-
-                <div class="grid gap-1.5">
-                    <Label>Priority</Label>
-                    <Select v-model="routeForm.priority">
-                        <SelectTrigger class="w-full bg-background">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="p in props.routeOptions.priorities"
-                                :key="p.value"
-                                :value="p.value"
-                                >{{ p.label }}</SelectItem
-                            >
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div
-                    v-if="routeForm.service_point_id"
-                    class="grid gap-1.5 sm:col-span-2"
-                >
-                    <Label>Assign to personnel</Label>
-                    <Select v-model="routeForm.assigned_to">
-                        <SelectTrigger class="w-full bg-background">
-                            <SelectValue
-                                placeholder="Unassigned — anyone at this point"
+                    <div
+                        v-if="showRouteForm && props.canRoute"
+                        class="mt-4 grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-2"
+                    >
+                        <div class="grid gap-1.5">
+                            <Label>Service point *</Label>
+                            <Select v-model="routeForm.service_point_id">
+                                <SelectTrigger class="w-full bg-background">
+                                    <SelectValue
+                                        placeholder="Select destination"
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="sp in props.servicePoints"
+                                        :key="sp.id"
+                                        :value="String(sp.id)"
+                                        >{{ sp.name }}</SelectItem
+                                    >
+                                </SelectContent>
+                            </Select>
+                            <InputError
+                                :message="routeForm.errors.service_point_id"
                             />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none"
-                                >Unassigned — anyone at this point</SelectItem
-                            >
-                            <SelectItem
-                                v-for="person in routePersonnel"
-                                :key="person.id"
-                                :value="String(person.id)"
-                                >{{ person.name }}</SelectItem
-                            >
-                        </SelectContent>
-                    </Select>
-                    <p
-                        v-if="!routePersonnel.length"
-                        class="text-xs text-muted-foreground"
-                    >
-                        No named staff configured for this point — it will go to
-                        the shared pool.
-                    </p>
-                </div>
-
-                <div v-if="!props.openVisit" class="grid gap-1.5">
-                    <Label>Visit reason</Label>
-                    <Select v-model="routeForm.visit_reason">
-                        <SelectTrigger class="w-full bg-background">
-                            <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="r in props.routeOptions.visitReasons"
-                                :key="r"
-                                :value="r"
-                                >{{ r }}</SelectItem
-                            >
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div
-                    class="grid gap-1.5"
-                    :class="props.openVisit ? '' : 'sm:col-span-2'"
-                >
-                    <Label>Note (optional)</Label>
-                    <Input
-                        v-model="routeForm.note"
-                        placeholder="e.g. Take vitals before consultation"
-                        class="bg-background"
-                    />
-                </div>
-
-                <div class="flex gap-2 sm:col-span-2">
-                    <Button
-                        size="sm"
-                        :disabled="routeForm.processing"
-                        @click="submitRoute"
-                    >
-                        Send to queue
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        @click="showRouteForm = false"
-                    >
-                        Cancel
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Visit timeline -->
-            <ol
-                v-if="props.openVisit && props.openVisit.entries.length"
-                class="mt-4 flex flex-col gap-3"
-            >
-                <li
-                    v-for="entry in props.openVisit.entries"
-                    :key="entry.id"
-                    class="flex gap-3"
-                >
-                    <div class="flex flex-col items-center">
-                        <CircleDot class="size-4 text-muted-foreground" />
-                        <span class="mt-1 w-px flex-1 bg-border" />
-                    </div>
-                    <div class="flex-1 pb-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="text-sm font-medium">{{
-                                entry.service_point
-                            }}</span>
-                            <span
-                                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                :class="statusClass(entry.status)"
-                            >
-                                {{ entry.status_label }}
-                            </span>
-                            <span
-                                v-if="entry.priority !== 'normal'"
-                                class="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 capitalize dark:text-amber-400"
-                            >
-                                {{ entry.priority_label }}
-                            </span>
                         </div>
-                        <p class="mt-0.5 text-xs text-muted-foreground">
-                            <span v-if="entry.queued_at"
-                                >Queued {{ entry.queued_at }}</span
-                            >
-                            <span v-if="entry.started_at">
-                                · started {{ entry.started_at }}</span
-                            >
-                            <span v-if="entry.completed_at">
-                                · completed {{ entry.completed_at }}</span
-                            >
-                            <span v-if="entry.assigned_to">
-                                · {{ entry.assigned_to }}</span
-                            >
-                        </p>
-                        <p
-                            v-if="entry.note"
-                            class="mt-1 text-xs text-muted-foreground"
+
+                        <div class="grid gap-1.5">
+                            <Label>Priority</Label>
+                            <Select v-model="routeForm.priority">
+                                <SelectTrigger class="w-full bg-background">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="p in props.routeOptions
+                                            .priorities"
+                                        :key="p.value"
+                                        :value="p.value"
+                                        >{{ p.label }}</SelectItem
+                                    >
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div
+                            v-if="routeForm.service_point_id"
+                            class="grid gap-1.5 sm:col-span-2"
                         >
-                            {{ entry.note }}
-                        </p>
+                            <Label>Assign to personnel</Label>
+                            <Select v-model="routeForm.assigned_to">
+                                <SelectTrigger class="w-full bg-background">
+                                    <SelectValue
+                                        placeholder="Unassigned — anyone at this point"
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none"
+                                        >Unassigned — anyone at this
+                                        point</SelectItem
+                                    >
+                                    <SelectItem
+                                        v-for="person in routePersonnel"
+                                        :key="person.id"
+                                        :value="String(person.id)"
+                                        >{{ person.name }}</SelectItem
+                                    >
+                                </SelectContent>
+                            </Select>
+                            <p
+                                v-if="!routePersonnel.length"
+                                class="text-xs text-muted-foreground"
+                            >
+                                No named staff configured for this point — it
+                                will go to the shared pool.
+                            </p>
+                        </div>
+
+                        <div v-if="!props.openVisit" class="grid gap-1.5">
+                            <Label>Visit reason</Label>
+                            <Select v-model="routeForm.visit_reason">
+                                <SelectTrigger class="w-full bg-background">
+                                    <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="r in props.routeOptions
+                                            .visitReasons"
+                                        :key="r"
+                                        :value="r"
+                                        >{{ r }}</SelectItem
+                                    >
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div
+                            class="grid gap-1.5"
+                            :class="props.openVisit ? '' : 'sm:col-span-2'"
+                        >
+                            <Label>Note (optional)</Label>
+                            <Input
+                                v-model="routeForm.note"
+                                placeholder="e.g. Take vitals before consultation"
+                                class="bg-background"
+                            />
+                        </div>
+
+                        <div class="flex gap-2 sm:col-span-2">
+                            <Button
+                                size="sm"
+                                :disabled="routeForm.processing"
+                                @click="submitRoute"
+                            >
+                                Send to queue
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                @click="showRouteForm = false"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
                     </div>
-                </li>
-            </ol>
+
+                    <!-- Visit timeline -->
+                    <ol
+                        v-if="props.openVisit && props.openVisit.entries.length"
+                        class="mt-4 flex flex-col gap-3"
+                    >
+                        <li
+                            v-for="entry in props.openVisit.entries"
+                            :key="entry.id"
+                            class="flex gap-3"
+                        >
+                            <div class="flex flex-col items-center">
+                                <CircleDot
+                                    class="size-4 text-muted-foreground"
+                                />
+                                <span class="mt-1 w-px flex-1 bg-border" />
+                            </div>
+                            <div class="flex-1 pb-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-sm font-medium">{{
+                                        entry.service_point
+                                    }}</span>
+                                    <span
+                                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                        :class="statusClass(entry.status)"
+                                    >
+                                        {{ entry.status_label }}
+                                    </span>
+                                    <span
+                                        v-if="entry.priority !== 'normal'"
+                                        class="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 capitalize dark:text-amber-400"
+                                    >
+                                        {{ entry.priority_label }}
+                                    </span>
+                                </div>
+                                <p class="mt-0.5 text-xs text-muted-foreground">
+                                    <span v-if="entry.queued_at"
+                                        >Queued {{ entry.queued_at }}</span
+                                    >
+                                    <span v-if="entry.started_at">
+                                        · started {{ entry.started_at }}</span
+                                    >
+                                    <span v-if="entry.completed_at">
+                                        · completed
+                                        {{ entry.completed_at }}</span
+                                    >
+                                    <span v-if="entry.assigned_to">
+                                        · {{ entry.assigned_to }}</span
+                                    >
+                                </p>
+                                <p
+                                    v-if="entry.note"
+                                    class="mt-1 text-xs text-muted-foreground"
+                                >
+                                    {{ entry.note }}
+                                </p>
+                            </div>
+                        </li>
+                    </ol>
                 </section>
             </TabsContent>
 
             <!-- ===== VITALS ===== -->
-            <TabsContent value="vitals">
+            <TabsContent value="observations">
                 <section class="rounded-xl border border-border bg-card p-5">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center gap-2">
-                    <h2 class="text-sm font-semibold">
-                        Vitals &amp; anthropometrics
-                    </h2>
-                    <span
-                        v-if="latestVitals && alertBadge(latestVitals.alert_level)"
-                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
-                        :class="alertBadge(latestVitals.alert_level)!.class"
+                    <div
+                        class="flex flex-wrap items-center justify-between gap-2"
                     >
-                        {{ alertBadge(latestVitals.alert_level)!.label }}
-                    </span>
-                </div>
-                <span
-                    v-if="latestVitals"
-                    class="text-xs text-muted-foreground"
-                >
-                    Last recorded {{ latestVitals.recorded_at_diff }}
-                    <span v-if="latestVitals.recorded_by"
-                        >· {{ latestVitals.recorded_by }}</span
-                    >
-                </span>
-            </div>
-
-            <div
-                v-if="latestVitals && latestVitals.flags.length"
-                class="mt-2 text-xs text-muted-foreground"
-            >
-                Flags:
-                <span class="font-medium text-foreground">{{
-                    latestVitals.flags.map((f) => f.label).join(', ')
-                }}</span>
-            </div>
-
-            <div v-if="latestVitals" class="mt-3 flex flex-wrap gap-2">
-                <span
-                    v-for="chip in vitalsChips(latestVitals)"
-                    :key="chip.label"
-                    class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm"
-                    :class="chipClass(chip.level)"
-                    :title="chip.reason ?? undefined"
-                >
-                    <span
-                        class="text-xs"
-                        :class="
-                            chip.level === 'normal'
-                                ? 'text-muted-foreground'
-                                : 'opacity-80'
-                        "
-                        >{{ chip.label }}</span
-                    >
-                    <span class="font-semibold">{{ chip.value }}</span>
-                </span>
-            </div>
-
-            <VitalsTrends v-if="props.vitals.length > 1" :vitals="props.vitals" />
-            <p v-else class="mt-2 text-sm text-muted-foreground">
-                No vitals recorded yet. These are captured at Triage during a visit.
-            </p>
-
-            <p
-                v-if="latestVitals?.notes"
-                class="mt-2 text-xs text-muted-foreground"
-            >
-                {{ latestVitals.notes }}
-            </p>
-
-            <div
-                v-if="props.vitals.length > 1"
-                class="mt-4 border-t border-border pt-3"
-            >
-                <p class="mb-2 text-xs font-semibold text-muted-foreground">
-                    Earlier readings
-                </p>
-                <ul class="flex flex-col gap-2">
-                    <li
-                        v-for="v in props.vitals.slice(1)"
-                        :key="v.id"
-                        class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
-                    >
-                        <span class="text-muted-foreground">{{
-                            v.recorded_at
-                        }}</span>
+                        <h2 class="text-sm font-semibold">
+                            Observations &amp; anthropometrics
+                        </h2>
                         <span
-                            v-for="chip in vitalsChips(v)"
-                            :key="chip.label"
-                            class="text-muted-foreground"
+                            v-if="latestObservations"
+                            class="text-xs text-muted-foreground"
                         >
-                            {{ chip.label }}
-                            <span class="font-medium text-foreground">{{
-                                chip.value
-                            }}</span>
+                            Last recorded
+                            {{ latestObservations.recorded_at_diff }}
+                            <span v-if="latestObservations.recorded_by"
+                                >· {{ latestObservations.recorded_by }}</span
+                            >
                         </span>
-                    </li>
-                </ul>
-            </div>
+                    </div>
+
+                    <div v-if="latestObservations" class="mt-3">
+                        <ObservationChips :set="latestObservations" size="sm" />
+                        <p
+                            v-if="latestObservations.notes"
+                            class="mt-2 text-xs text-muted-foreground"
+                        >
+                            {{ latestObservations.notes }}
+                        </p>
+                    </div>
+                    <p v-else class="mt-2 text-sm text-muted-foreground">
+                        No observations recorded yet. These are captured at
+                        triage, during an encounter, or on the ward.
+                    </p>
+
+                    <ObservationTrends
+                        v-if="props.observationSets.length > 1"
+                        :sets="props.observationSets"
+                    />
+
+                    <div
+                        v-if="props.observationSets.length > 1"
+                        class="mt-4 border-t border-border pt-3"
+                    >
+                        <p
+                            class="mb-2 text-xs font-semibold text-muted-foreground"
+                        >
+                            Earlier sets
+                        </p>
+                        <ObservationHistory
+                            :sets="props.observationSets.slice(1)"
+                        />
+                    </div>
                 </section>
             </TabsContent>
 
             <!-- ===== DEMOGRAPHICS ===== -->
             <TabsContent value="demographics">
                 <div class="grid gap-6 md:grid-cols-2">
-            <section class="rounded-xl border border-border bg-card p-5">
-                <h2 class="mb-4 text-sm font-semibold">Identity</h2>
-                <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <div v-for="f in identity" :key="f.label" class="min-w-0">
-                        <dt class="text-xs text-muted-foreground">
-                            {{ f.label }}
-                        </dt>
-                        <dd class="truncate text-sm">{{ f.value || '—' }}</dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section class="rounded-xl border border-border bg-card p-5">
-                <h2 class="mb-4 text-sm font-semibold">Contact &amp; residence</h2>
-                <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <div v-for="f in contact" :key="f.label" class="min-w-0">
-                        <dt class="text-xs text-muted-foreground">
-                            {{ f.label }}
-                        </dt>
-                        <dd class="text-sm">{{ f.value || '—' }}</dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section class="rounded-xl border border-border bg-card p-5">
-                <h2 class="mb-4 text-sm font-semibold">Next of kin</h2>
-                <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <div v-for="f in nextOfKin" :key="f.label" class="min-w-0">
-                        <dt class="text-xs text-muted-foreground">
-                            {{ f.label }}
-                        </dt>
-                        <dd class="text-sm">{{ f.value || '—' }}</dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section class="rounded-xl border border-border bg-card p-5">
-                <h2 class="mb-4 text-sm font-semibold">Billing coverage</h2>
-                <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <div v-for="f in billing" :key="f.label" class="min-w-0">
-                        <dt class="text-xs text-muted-foreground">
-                            {{ f.label }}
-                        </dt>
-                        <dd class="text-sm">{{ f.value || '—' }}</dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section
-                class="rounded-xl border border-border bg-card p-5 md:col-span-2"
-            >
-                <h2 class="mb-4 text-sm font-semibold">Visit &amp; routing</h2>
-                <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-                    <div v-for="f in visit" :key="f.label" class="min-w-0">
-                        <dt class="text-xs text-muted-foreground">
-                            {{ f.label }}
-                        </dt>
-                        <dd class="text-sm">{{ f.value || '—' }}</dd>
-                    </div>
-                </dl>
-
-                <div
-                    v-if="props.patient.is_transfer"
-                    class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4"
-                >
-                    <h3
-                        class="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-400"
+                    <section
+                        class="rounded-xl border border-border bg-card p-5"
                     >
-                        Inter-facility transfer
-                    </h3>
-                    <dl class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-3">
-                        <div>
-                            <dt class="text-xs text-muted-foreground">
-                                Transferred from
-                            </dt>
-                            <dd class="text-sm">
-                                {{ props.patient.transfer_from || '—' }}
-                            </dd>
+                        <h2 class="mb-4 text-sm font-semibold">Identity</h2>
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
+                            <div
+                                v-for="f in identity"
+                                :key="f.label"
+                                class="min-w-0"
+                            >
+                                <dt class="text-xs text-muted-foreground">
+                                    {{ f.label }}
+                                </dt>
+                                <dd class="truncate text-sm">
+                                    {{ f.value || '—' }}
+                                </dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section
+                        class="rounded-xl border border-border bg-card p-5"
+                    >
+                        <h2 class="mb-4 text-sm font-semibold">
+                            Contact &amp; residence
+                        </h2>
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
+                            <div
+                                v-for="f in contact"
+                                :key="f.label"
+                                class="min-w-0"
+                            >
+                                <dt class="text-xs text-muted-foreground">
+                                    {{ f.label }}
+                                </dt>
+                                <dd class="text-sm">{{ f.value || '—' }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section
+                        class="rounded-xl border border-border bg-card p-5"
+                    >
+                        <h2 class="mb-4 text-sm font-semibold">Next of kin</h2>
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
+                            <div
+                                v-for="f in nextOfKin"
+                                :key="f.label"
+                                class="min-w-0"
+                            >
+                                <dt class="text-xs text-muted-foreground">
+                                    {{ f.label }}
+                                </dt>
+                                <dd class="text-sm">{{ f.value || '—' }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section
+                        class="rounded-xl border border-border bg-card p-5"
+                    >
+                        <h2 class="mb-4 text-sm font-semibold">
+                            Billing coverage
+                        </h2>
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-3">
+                            <div
+                                v-for="f in billing"
+                                :key="f.label"
+                                class="min-w-0"
+                            >
+                                <dt class="text-xs text-muted-foreground">
+                                    {{ f.label }}
+                                </dt>
+                                <dd class="text-sm">{{ f.value || '—' }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section
+                        class="rounded-xl border border-border bg-card p-5 md:col-span-2"
+                    >
+                        <h2 class="mb-4 text-sm font-semibold">
+                            Visit &amp; routing
+                        </h2>
+                        <dl
+                            class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4"
+                        >
+                            <div
+                                v-for="f in visit"
+                                :key="f.label"
+                                class="min-w-0"
+                            >
+                                <dt class="text-xs text-muted-foreground">
+                                    {{ f.label }}
+                                </dt>
+                                <dd class="text-sm">{{ f.value || '—' }}</dd>
+                            </div>
+                        </dl>
+
+                        <div
+                            v-if="props.patient.is_transfer"
+                            class="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4"
+                        >
+                            <h3
+                                class="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-400"
+                            >
+                                Inter-facility transfer
+                            </h3>
+                            <dl
+                                class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-3"
+                            >
+                                <div>
+                                    <dt class="text-xs text-muted-foreground">
+                                        Transferred from
+                                    </dt>
+                                    <dd class="text-sm">
+                                        {{ props.patient.transfer_from || '—' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-muted-foreground">
+                                        Reason
+                                    </dt>
+                                    <dd class="text-sm">
+                                        {{
+                                            props.patient.transfer_reason || '—'
+                                        }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-muted-foreground">
+                                        Service to provide
+                                    </dt>
+                                    <dd class="text-sm">
+                                        {{
+                                            props.patient.transfer_service ||
+                                            '—'
+                                        }}
+                                    </dd>
+                                </div>
+                            </dl>
                         </div>
-                        <div>
-                            <dt class="text-xs text-muted-foreground">Reason</dt>
-                            <dd class="text-sm">
-                                {{ props.patient.transfer_reason || '—' }}
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs text-muted-foreground">
-                                Service to provide
-                            </dt>
-                            <dd class="text-sm">
-                                {{ props.patient.transfer_service || '—' }}
-                            </dd>
-                        </div>
-                    </dl>
-                </div>
-            </section>
+                    </section>
                 </div>
             </TabsContent>
 
@@ -988,73 +1166,10 @@ const visit = computed<Field[]>(() => [
                     <h2 class="mb-4 text-sm font-semibold">
                         Clinical encounters
                     </h2>
-                    <ol
-                        v-if="props.encounters.length"
-                        class="flex flex-col gap-4"
-                    >
-                        <li
-                            v-for="e in props.encounters"
-                            :key="e.id"
-                            class="rounded-lg border border-border p-4"
-                        >
-                            <div
-                                class="flex flex-wrap items-center justify-between gap-2"
-                            >
-                                <span class="text-sm font-semibold">{{
-                                    e.diagnosis || 'No diagnosis recorded'
-                                }}</span>
-                                <span
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                    :class="
-                                        e.status === 'completed'
-                                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                                            : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                                    "
-                                    >{{
-                                        e.status === 'completed'
-                                            ? 'Completed'
-                                            : 'Draft'
-                                    }}</span
-                                >
-                            </div>
-                            <p class="mt-1 text-xs text-muted-foreground">
-                                {{ e.date }}
-                                <span v-if="e.clinician">
-                                    · {{ e.clinician }}</span
-                                >
-                            </p>
-                            <dl class="mt-3 grid gap-3 sm:grid-cols-2">
-                                <div v-if="e.presenting_complaint">
-                                    <dt class="text-xs text-muted-foreground">
-                                        Presenting complaint
-                                    </dt>
-                                    <dd class="text-sm whitespace-pre-line">
-                                        {{ e.presenting_complaint }}
-                                    </dd>
-                                </div>
-                                <div v-if="e.examination">
-                                    <dt class="text-xs text-muted-foreground">
-                                        Examination
-                                    </dt>
-                                    <dd class="text-sm whitespace-pre-line">
-                                        {{ e.examination }}
-                                    </dd>
-                                </div>
-                                <div v-if="e.plan" class="sm:col-span-2">
-                                    <dt class="text-xs text-muted-foreground">
-                                        Plan
-                                    </dt>
-                                    <dd class="text-sm whitespace-pre-line">
-                                        {{ e.plan }}
-                                    </dd>
-                                </div>
-                            </dl>
-                        </li>
-                    </ol>
-                    <p v-else class="text-sm text-muted-foreground">
-                        No clinical encounters yet. These are documented by a
-                        clinician during a consultation.
-                    </p>
+                    <EncounterTimeline
+                        :encounters="props.encounters"
+                        empty-text="No clinical encounters yet. Consultations, nursing sessions and ward rounds all appear here once documented."
+                    />
                 </section>
             </TabsContent>
         </Tabs>

@@ -24,9 +24,21 @@ export type Auth = {
     modules: NavModule[];
 };
 
+/** The facility profile captured by the first-run wizard. */
+export type FacilityProfile = {
+    name: string | null;
+    state: string | null;
+    lga: string | null;
+    code: string | null;
+    /** A notice shown to every member of staff on the home screen. */
+    notice: string | null;
+    completed_at: string | null;
+};
+
 export type SharedData = {
     name: string;
     auth: Auth;
+    facility: FacilityProfile;
     sidebarOpen: boolean;
     [key: string]: unknown;
 };

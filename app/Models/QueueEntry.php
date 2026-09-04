@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\Priority;
 use App\Enums\QueueStatus;
+use App\Models\Concerns\Auditable;
+use App\Models\Contracts\AuditableRecord;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,8 +31,10 @@ use Illuminate\Support\Carbon;
     'visit_id', 'patient_id', 'service_point_id', 'status', 'priority', 'note',
     'routed_by', 'assigned_to', 'queued_at', 'started_at', 'completed_at',
 ])]
-class QueueEntry extends Model
+class QueueEntry extends Model implements AuditableRecord
 {
+    use Auditable;
+
     /**
      * Get the attributes that should be cast.
      *

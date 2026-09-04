@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+use App\Models\Contracts\AuditableRecord;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,8 +16,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property bool $grants_all_modules
  */
 #[Fillable(['name', 'slug', 'description', 'grants_all_modules'])]
-class Role extends Model
+class Role extends Model implements AuditableRecord
 {
+    use Auditable;
+
     /**
      * Get the attributes that should be cast.
      *

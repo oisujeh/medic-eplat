@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import * as LucideIcons from '@lucide/vue';
-import { ListChecks, Lock } from '@lucide/vue';
+import { ListChecks, Lock, SlidersHorizontal } from '@lucide/vue';
 import type { LucideIcon } from '@lucide/vue';
+import { Button } from '@/components/ui/button';
 
 type ServicePoint = {
     name: string;
@@ -11,7 +12,9 @@ type ServicePoint = {
     description: string | null;
     waiting: number;
     in_service: number;
-    can_work: boolean;
+    module: string | null;
+    console_url: string | null;
+    manage_url: string | null;
 };
 
 defineProps<{ servicePoints: ServicePoint[] }>();
@@ -32,25 +35,22 @@ const iconFor = (name: string | null): LucideIcon =>
 
     <div class="flex h-full flex-1 flex-col gap-6 p-4">
         <div>
-            <h1 class="text-2xl font-semibold tracking-tight">Service Queues</h1>
+            <h1 class="text-2xl font-semibold tracking-tight">
+                Service Queues
+            </h1>
             <p class="mt-1 text-sm text-muted-foreground">
-                Live patient queues across service points. Open a queue you staff
-                to call and attend to patients.
+                Live patient queues across the facility. Attend to patients from
+                a module's console; manage a queue to reassign, re-route or
+                cancel entries.
             </p>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <component
-                :is="sp.can_work ? Link : 'div'"
+            <div
                 v-for="sp in servicePoints"
                 :key="sp.slug"
-                :href="sp.can_work ? `/queues/${sp.slug}` : undefined"
-                class="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 transition-colors"
-                :class="
-                    sp.can_work
-                        ? 'cursor-pointer hover:border-primary/40 hover:bg-muted/40'
-                        : 'opacity-70'
-                "
+                class="flex flex-col gap-3 rounded-xl border border-border bg-card p-5"
+                :class="sp.console_url || sp.manage_url ? '' : 'opacity-70'"
             >
                 <div class="flex items-center justify-between">
                     <span
@@ -59,7 +59,7 @@ const iconFor = (name: string | null): LucideIcon =>
                         <component :is="iconFor(sp.icon)" class="size-5" />
                     </span>
                     <Lock
-                        v-if="!sp.can_work"
+                        v-if="!sp.console_url && !sp.manage_url"
                         class="size-4 text-muted-foreground"
                     />
                 </div>
@@ -72,13 +72,17 @@ const iconFor = (name: string | null): LucideIcon =>
                         {{ sp.description }}
                     </p>
                 </div>
-                <div class="mt-auto flex gap-4 text-sm">
+                <div class="flex gap-4 text-sm">
                     <span class="flex items-baseline gap-1">
-                        <span class="text-lg font-semibold">{{ sp.waiting }}</span>
-                        <span class="text-xs text-muted-foreground">waiting</span>
+                        <span class="text-lg font-semibold tabular-nums">{{
+                            sp.waiting
+                        }}</span>
+                        <span class="text-xs text-muted-foreground"
+                            >waiting</span
+                        >
                     </span>
                     <span class="flex items-baseline gap-1">
-                        <span class="text-lg font-semibold">{{
+                        <span class="text-lg font-semibold tabular-nums">{{
                             sp.in_service
                         }}</span>
                         <span class="text-xs text-muted-foreground"
@@ -86,7 +90,28 @@ const iconFor = (name: string | null): LucideIcon =>
                         >
                     </span>
                 </div>
-            </component>
+                <div
+                    v-if="sp.console_url || sp.manage_url"
+                    class="mt-auto flex flex-wrap gap-2"
+                >
+                    <Button v-if="sp.console_url" as-child size="sm">
+                        <Link :href="sp.console_url">
+                            Open {{ sp.module ?? 'console' }}
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="sp.manage_url"
+                        as-child
+                        size="sm"
+                        variant="outline"
+                    >
+                        <Link :href="sp.manage_url">
+                            <SlidersHorizontal class="size-4" />
+                            Manage queue
+                        </Link>
+                    </Button>
+                </div>
+            </div>
         </div>
     </div>
 </template>

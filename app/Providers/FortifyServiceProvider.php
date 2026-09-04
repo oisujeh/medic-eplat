@@ -51,7 +51,9 @@ class FortifyServiceProvider extends ServiceProvider
 
             $user = User::where($field, $login)->first();
 
-            if ($user && Hash::check((string) $request->input('password'), $user->password)) {
+            // A deactivated account is refused as if the credentials were
+            // wrong, rather than confirming the account exists.
+            if ($user && ! $user->isDeactivated() && Hash::check((string) $request->input('password'), $user->password)) {
                 return $user;
             }
 
@@ -81,10 +83,6 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/VerifyEmail', [
             'status' => $request->session()->get('status'),
-        ]));
-
-        Fortify::registerView(fn () => Inertia::render('auth/Register', [
-            'passwordRules' => Password::defaults()->toPasswordRulesString(),
         ]));
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/TwoFactorChallenge'));

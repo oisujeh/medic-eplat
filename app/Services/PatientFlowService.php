@@ -79,6 +79,34 @@ class PatientFlowService
     }
 
     /**
+     * Hand an entry to a staff member, or back to the unassigned pool.
+     */
+    public function assign(QueueEntry $entry, ?User $assignee): QueueEntry
+    {
+        $entry->update(['assigned_to' => $assignee?->id]);
+
+        return $entry;
+    }
+
+    /**
+     * Move a misrouted entry to another service point: the current entry is
+     * cancelled and a fresh one queued at the destination, same visit.
+     */
+    public function reroute(
+        QueueEntry $entry,
+        ServicePoint $next,
+        User $actor,
+        Priority $priority = Priority::Normal,
+        ?string $note = null,
+    ): QueueEntry {
+        return DB::transaction(function () use ($entry, $next, $actor, $priority, $note) {
+            $this->cancel($entry, $actor, $note ? "Re-routed to {$next->name}: {$note}" : "Re-routed to {$next->name}");
+
+            return $this->pushEntry($entry->visit, $next, $actor, $priority, $note);
+        });
+    }
+
+    /**
      * Cancel an entry (e.g. routed in error or patient left).
      */
     public function cancel(QueueEntry $entry, User $actor, ?string $reason = null): QueueEntry
@@ -112,11 +140,21 @@ class PatientFlowService
     }
 
     /**
+     * The patient's open visit, opening one when there is none. Used by
+     * workflows such as admission that need a visit to bill against without
+     * queueing the patient anywhere.
+     */
+    public function ensureOpenVisit(Patient $patient, User $actor, ?string $reason = null): Visit
+    {
+        return $patient->openVisit() ?? $this->openVisit($patient, $actor, $reason);
+    }
+
+    /**
      * Open a new visit for a patient, generating a human-readable visit number.
      */
     protected function openVisit(Patient $patient, User $actor, ?string $reason): Visit
     {
-        $visit = new Visit();
+        $visit = new Visit;
         $visit->patient_id = $patient->id;
         $visit->status = VisitStatus::Open;
         $visit->reason = $reason;

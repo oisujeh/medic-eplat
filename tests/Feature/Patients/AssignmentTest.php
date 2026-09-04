@@ -79,16 +79,20 @@ test('personnel see their assigned patients plus the unassigned pool', function 
         'priority' => 'normal',
     ]);
 
-    // Nurse A sees both (their assignment + the pool).
-    actingAs($nurseA)->get(route('queues.show', 'triage'))
-        ->assertInertia(fn ($page) => $page->has('entries', 2));
+    // On the nursing console, nurse A sees both (their assignment + the pool).
+    actingAs($nurseA)->get(route('nursing.index'))
+        ->assertInertia(fn ($page) => $page->has('queue', 2)->where('seesAll', false));
 
     // Nurse B sees only the unassigned pool patient.
-    actingAs($nurseB)->get(route('queues.show', 'triage'))
+    actingAs($nurseB)->get(route('nursing.index'))
         ->assertInertia(fn ($page) => $page
-            ->has('entries', 1)
-            ->where('entries.0.patient.name', fn ($n) => str_contains($n, 'Pool'))
+            ->has('queue', 1)
+            ->where('queue.0.patient.name', fn ($n) => str_contains($n, 'Pool'))
         );
+
+    // The queue management page shows the whole queue to either nurse.
+    actingAs($nurseB)->get(route('queues.show', 'triage'))
+        ->assertInertia(fn ($page) => $page->has('entries', 2));
 });
 
 test('a full-access user sees the entire queue', function () {
@@ -105,8 +109,9 @@ test('a full-access user sees the entire queue', function () {
         'priority' => 'normal',
     ]);
 
+    // The management page lists every entry, whoever holds the patient.
     actingAs(assignUser(['super-administrator']))->get(route('queues.show', 'triage'))
-        ->assertInertia(fn ($page) => $page->has('entries', 2)->where('seesAll', true));
+        ->assertInertia(fn ($page) => $page->has('entries', 2));
 });
 
 test('routing onward can assign the next personnel', function () {
@@ -120,14 +125,15 @@ test('routing onward can assign the next personnel', function () {
         'priority' => 'normal',
     ]);
 
-    $entry = QueueEntry::first();
-    actingAs($nurse)->post(route('queue-entries.call', $entry));
+    // Onward routing happens when the nurse signs the triage encounter.
+    $encounter = openEncounter(QueueEntry::first(), $nurse, 'nursing.workspace');
 
-    actingAs($nurse)->post(route('queue-entries.complete', $entry), [
+    actingAs($nurse)->post(route('encounters.sign', $encounter), [
+        'objective' => 'Vitals taken',
         'next_service_point_id' => assignSp('consultation')->id,
         'next_assigned_to' => $physician->id,
         'next_priority' => 'normal',
-    ]);
+    ])->assertSessionHasNoErrors();
 
     $onward = QueueEntry::where('service_point_id', assignSp('consultation')->id)->first();
     expect($onward->assigned_to)->toBe($physician->id);

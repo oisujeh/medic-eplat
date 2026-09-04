@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\FacilitySettings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -15,6 +16,8 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    public function __construct(private readonly FacilitySettings $facility) {}
 
     /**
      * Determines the current asset version.
@@ -40,6 +43,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'facility' => $this->facility->profile(),
             'auth' => [
                 'user' => $user,
                 'roles' => $user
