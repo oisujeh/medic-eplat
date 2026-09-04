@@ -260,6 +260,16 @@ class Patient extends Model implements AuditableRecord
     }
 
     /**
+     * Outbound referrals, most recent first.
+     *
+     * @return HasMany<Referral, $this>
+     */
+    public function referrals(): HasMany
+    {
+        return $this->hasMany(Referral::class)->latest('referred_at');
+    }
+
+    /**
      * Pregnancy episodes, most recent first.
      *
      * @return HasMany<Pregnancy, $this>

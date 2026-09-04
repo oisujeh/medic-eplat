@@ -22,6 +22,7 @@ use App\Http\Resources\ObservationSetResource;
 use App\Http\Resources\PatientAlertResource;
 use App\Http\Resources\PatientBannerResource;
 use App\Http\Resources\ProblemResource;
+use App\Http\Resources\ReferralResource;
 use App\Http\Resources\ServicePointOptionResource;
 use App\Models\Encounter;
 use App\Models\LabTest;
@@ -29,6 +30,7 @@ use App\Models\ServicePoint;
 use App\Services\AppointmentService;
 use App\Services\CaseSurveillance;
 use App\Services\EncounterService;
+use App\Services\ReferralService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,6 +47,7 @@ class EncounterController extends Controller
         private readonly EncounterService $encounters,
         private readonly AppointmentService $appointments,
         private readonly CaseSurveillance $surveillance,
+        private readonly ReferralService $referrals,
     ) {}
 
     /**
@@ -85,6 +88,10 @@ class EncounterController extends Controller
             'labResults' => LabResultResource::collection($patient->labResults),
             'alerts' => PatientAlertResource::collection($patient->alerts),
             'surveillanceCases' => $this->surveillance->bannerFor($patient),
+            'referrals' => ReferralResource::collection(
+                $patient->referrals()->latest('referred_at')->take(5)->get(),
+            ),
+            'referralDraft' => $this->referrals->draftFor($encounter),
             'immunizations' => ImmunizationResource::collection($encounter->immunizations),
             'addenda' => EncounterAddendumResource::collection($encounter->addenda),
             'observationSets' => ObservationSetResource::collection($observationSets),

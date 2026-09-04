@@ -9,6 +9,7 @@ use App\Enums\BillStatus;
 use App\Enums\ClaimStatus;
 use App\Enums\LabOrderStatus;
 use App\Enums\MaternalOutcome;
+use App\Enums\ReferralStatus;
 use App\Models\Admission;
 use App\Models\Appointment;
 use App\Models\Bill;
@@ -22,6 +23,7 @@ use App\Models\InventoryItem;
 use App\Models\LabOrder;
 use App\Models\Patient;
 use App\Models\Payment;
+use App\Models\Referral;
 use App\Models\StockBatch;
 use App\Models\Ward;
 use Illuminate\Support\Carbon;
@@ -80,6 +82,7 @@ class ReportRegistry
             ['key' => 'patient-register', 'name' => 'Patient Register', 'category' => 'opd', 'description' => 'Patients registered within the period.', 'icon' => 'UserPlus', 'type' => 'table', 'featured' => true],
             ['key' => 'diagnoses-summary', 'name' => 'Diagnoses Summary', 'category' => 'opd', 'description' => 'Most frequent working diagnoses.', 'icon' => 'Stethoscope', 'type' => 'table', 'featured' => false],
             ['key' => 'consultations-log', 'name' => 'Consultations Log', 'category' => 'opd', 'description' => 'Completed consultations with outcomes.', 'icon' => 'ClipboardList', 'type' => 'table', 'featured' => false],
+            ['key' => 'referral-register', 'name' => 'Referral Register', 'category' => 'opd', 'description' => 'Patients referred to other facilities within the period, with urgency, status and feedback.', 'icon' => 'Send', 'type' => 'table', 'featured' => false],
 
             ['key' => 'lab-orders', 'name' => 'Laboratory Orders', 'category' => 'laboratory', 'description' => 'Requisitions placed within the period.', 'icon' => 'FlaskConical', 'type' => 'table', 'featured' => false],
             ['key' => 'lab-turnaround', 'name' => 'Lab Turnaround', 'category' => 'laboratory', 'description' => 'Order-to-verification turnaround times.', 'icon' => 'Timer', 'type' => 'table', 'featured' => false],
@@ -141,6 +144,7 @@ class ReportRegistry
             'patient-register' => $this->patientRegister($from, $to),
             'diagnoses-summary' => $this->diagnosesSummary($from, $to),
             'consultations-log' => $this->consultationsLog($from, $to),
+            'referral-register' => $this->referralRegister($from, $to),
             'lab-orders' => $this->labOrders($from, $to),
             'lab-turnaround' => $this->labTurnaround($from, $to),
             'dispensing-log' => $this->dispensingLog($from, $to),
@@ -341,6 +345,52 @@ class ReportRegistry
             'summary' => [
                 ['label' => 'Distinct diagnoses', 'value' => (string) count($rows)],
                 ['label' => 'Total cases', 'value' => (string) $diagnoses->count()],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function referralRegister(Carbon $from, Carbon $to): array
+    {
+        $referrals = Referral::query()
+            ->whereBetween('referred_at', [$from, $to])
+            ->with(['patient:id,file_number,surname,first_name,other_names', 'referredBy:id,name'])
+            ->orderBy('referred_at')
+            ->get();
+
+        $rows = $referrals->map(fn (Referral $r) => [
+            'date' => $r->referred_at->isoFormat('D MMM YYYY'),
+            'number' => $r->referral_number,
+            'file_number' => $r->patient->file_number,
+            'patient' => $r->patient->fullName(),
+            'destination' => trim($r->destination_facility.($r->destination_department ? ' · '.$r->destination_department : '')),
+            'urgency' => $r->urgency->label(),
+            'reason' => $r->reason,
+            'referred_by' => $r->referredBy?->name ?? '—',
+            'status' => $r->status->label(),
+            'feedback' => $r->feedback ?? '—',
+        ])->all();
+
+        return [
+            'columns' => [
+                ['key' => 'date', 'label' => 'Date', 'align' => 'left'],
+                ['key' => 'number', 'label' => 'Referral no.', 'align' => 'left'],
+                ['key' => 'file_number', 'label' => 'File no.', 'align' => 'left'],
+                ['key' => 'patient', 'label' => 'Patient', 'align' => 'left'],
+                ['key' => 'destination', 'label' => 'Referred to', 'align' => 'left'],
+                ['key' => 'urgency', 'label' => 'Urgency', 'align' => 'left'],
+                ['key' => 'reason', 'label' => 'Reason', 'align' => 'left'],
+                ['key' => 'referred_by', 'label' => 'Referred by', 'align' => 'left'],
+                ['key' => 'status', 'label' => 'Status', 'align' => 'left'],
+                ['key' => 'feedback', 'label' => 'Feedback', 'align' => 'left'],
+            ],
+            'rows' => $rows,
+            'summary' => [
+                ['label' => 'Referrals', 'value' => (string) $referrals->count()],
+                ['label' => 'Patient seen', 'value' => (string) $referrals->where('status', ReferralStatus::Seen)->count()],
+                ['label' => 'Still open', 'value' => (string) $referrals->filter(fn (Referral $r) => $r->status->isOpen())->count()],
             ],
         ];
     }

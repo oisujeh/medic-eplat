@@ -33,6 +33,7 @@ use App\Http\Controllers\ProblemController;
 use App\Http\Controllers\ProviderScheduleController;
 use App\Http\Controllers\QueueController;
 use App\Http\Controllers\QueueEntryController;
+use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\ReportCatalogController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportRunnerController;
@@ -147,6 +148,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('encounters/{encounter}/lab-results/{labResult}', [LabOrderController::class, 'destroy'])->name('encounters.lab-results.destroy');
 
     Route::post('encounters/{encounter}/immunizations', [ImmunizationController::class, 'store'])->name('encounters.immunizations.store');
+
+    // Referrals are issued from the encounter (authorised by the encounter
+    // policy) and tracked in the referrals module.
+    Route::post('encounters/{encounter}/referrals', [ReferralController::class, 'store'])->name('encounters.referrals.store');
+
+    Route::middleware('module:referrals')->group(function () {
+        Route::get('referrals', [ReferralController::class, 'index'])->name('referrals.index');
+        Route::get('referrals/{referral}', [ReferralController::class, 'show'])->name('referrals.show');
+        Route::get('referrals/{referral}/letter', [ReferralController::class, 'letter'])->name('referrals.letter');
+        Route::post('referrals/{referral}/status', [ReferralController::class, 'status'])->name('referrals.status');
+    });
     Route::delete('encounters/{encounter}/immunizations/{immunization}', [ImmunizationController::class, 'destroy'])->name('encounters.immunizations.destroy');
 
     // Observations — recorded from a queue, an encounter or a ward; the

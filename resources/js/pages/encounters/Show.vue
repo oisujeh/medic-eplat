@@ -35,6 +35,8 @@ import type {
     PatientAlert,
     PatientBanner as PatientBannerData,
     Problem,
+    Referral,
+    ReferralDraft,
     ServicePointOption,
 } from '@/types/clinical';
 
@@ -47,6 +49,8 @@ const props = defineProps<{
     labResults: LabResult[];
     alerts: PatientAlert[];
     surveillanceCases: SurveillanceCaseFlag[];
+    referrals: Referral[];
+    referralDraft: ReferralDraft;
     immunizations: Immunization[];
     addenda: EncounterAddendum[];
     observationSets: ObservationSet[];
@@ -188,6 +192,9 @@ const backLabel = isConsultation ? 'Back to clinical' : 'Back to nursing';
                         v-show="activeStage === 'follow_up'"
                         :outcomes="outcomes"
                         :clinics="onwardServicePoints"
+                        :referrals="referrals"
+                        :referral-draft="referralDraft"
+                        :priorities="priorities"
                     />
                 </template>
                 <NursingStage

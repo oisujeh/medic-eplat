@@ -51,8 +51,41 @@ export type EncounterUrls = {
     allergies: string;
     lab_orders: string;
     immunizations: string;
+    referrals: string;
     observations: string;
     console: string;
+};
+
+/** ReferralResource */
+export type Referral = {
+    id: number;
+    referral_number: string;
+    encounter_id: number | null;
+    urgency: string;
+    urgency_label: string;
+    destination_facility: string;
+    destination_department: string | null;
+    destination_contact: string | null;
+    reason: string;
+    diagnosis: string | null;
+    clinical_summary: string | null;
+    treatment_given: string | null;
+    status: string;
+    status_label: string;
+    status_tone: string;
+    is_open: boolean;
+    feedback: string | null;
+    feedback_at: string | null;
+    referred_at: string;
+    printed_at: string | null;
+    urls: { show: string; letter: string; status: string };
+};
+
+/** What the referral form is pre-filled with from the encounter. */
+export type ReferralDraft = {
+    diagnosis: string | null;
+    clinical_summary: string | null;
+    treatment_given: string | null;
 };
 
 /** EncounterResource */

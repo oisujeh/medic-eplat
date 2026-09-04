@@ -54,6 +54,7 @@ class EncounterResource extends JsonResource
                 'allergies' => route('encounters.allergies.store', $this->id),
                 'lab_orders' => route('encounters.lab-orders.store', $this->id),
                 'immunizations' => route('encounters.immunizations.store', $this->id),
+                'referrals' => route('encounters.referrals.store', $this->id),
                 'observations' => route('patients.observations.store', $this->patient_id),
                 'console' => $this->type->isConsultation() ? route('clinical.index') : route('nursing.index'),
             ],

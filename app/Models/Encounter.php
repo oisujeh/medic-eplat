@@ -134,6 +134,11 @@ class Encounter extends Model implements AuditableRecord
      *
      * @return HasMany<Problem, $this>
      */
+    public function referrals(): HasMany
+    {
+        return $this->hasMany(Referral::class)->latest('referred_at');
+    }
+
     public function problems(): HasMany
     {
         return $this->hasMany(Problem::class);

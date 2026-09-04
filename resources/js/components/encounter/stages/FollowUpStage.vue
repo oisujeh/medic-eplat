@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import { CalendarDays, CalendarPlus } from '@lucide/vue';
+import { computed } from 'vue';
+import ReferralPanel from '@/components/encounter/ReferralPanel.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,14 +26,28 @@ import {
     toDatetimeLocal,
     toggleInList,
 } from '@/lib/forms';
-import type { Option, ServicePointOption } from '@/types/clinical';
+import type {
+    Option,
+    Referral,
+    ReferralDraft,
+    ServicePointOption,
+} from '@/types/clinical';
 
-defineProps<{
+const props = defineProps<{
     outcomes: Option[];
     clinics: ServicePointOption[];
+    referrals: Referral[];
+    referralDraft: ReferralDraft;
+    priorities: Option[];
 }>();
 
 const { encounter, form, readOnly } = useEncounterContext();
+
+const referralNeeded = computed(
+    () =>
+        form.outcome === 'referred' &&
+        !props.referrals.some((r) => r.encounter_id === encounter.id),
+);
 
 // Picking an interval also seeds the next-appointment date.
 function pickInterval(code: string) {
@@ -195,8 +211,25 @@ function bookFollowUp() {
                     Signing with this outcome orders an admission; the ward
                     assigns the bed.
                 </p>
+                <p
+                    v-else-if="form.outcome === 'referred'"
+                    class="text-xs text-muted-foreground"
+                >
+                    Signing with this outcome needs a referral record; issue it
+                    below and print the letter.
+                </p>
             </div>
         </div>
+
+        <ReferralPanel
+            :referrals="referrals"
+            :draft="referralDraft"
+            :priorities="priorities"
+            :action="encounter.urls.referrals"
+            :encounter-id="encounter.id"
+            :read-only="readOnly"
+            :needed="referralNeeded"
+        />
 
         <div
             v-if="!readOnly"

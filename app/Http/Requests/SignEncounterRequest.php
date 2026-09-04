@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\EncounterOutcome;
 use App\Enums\Priority;
 use App\Http\Requests\Concerns\EncounterDocumentationRules;
 use App\Models\Encounter;
@@ -59,6 +60,13 @@ class SignEncounterRequest extends FormRequest
 
             if (! $coded) {
                 $validator->errors()->add('assessment', 'A diagnosis is required to sign the consultation — code one or write an impression.');
+            }
+        });
+
+        // An outcome of "Referred" needs the referral record that backs the letter.
+        $validator->after(function (Validator $validator) {
+            if ($this->input('outcome') === EncounterOutcome::Referred->value && ! $this->encounter()->referrals()->exists()) {
+                $validator->errors()->add('outcome', 'Issue the referral (destination and reason) before signing with the outcome Referred.');
             }
         });
     }

@@ -79,6 +79,11 @@ class RolesAndModulesSeeder extends Seeder
             'roles' => ['chief-medical-director', 'physician', 'nurse', 'records-officer'],
         ],
         [
+            'slug' => 'referrals', 'name' => 'Referrals', 'icon' => 'Send',
+            'href' => '/referrals', 'sort_order' => 36,
+            'roles' => ['chief-medical-director', 'physician', 'nurse', 'records-officer'],
+        ],
+        [
             'slug' => 'admissions', 'name' => 'Admissions / Wards', 'icon' => 'BedDouble',
             'href' => '/admissions', 'sort_order' => 35,
             'roles' => ['chief-medical-director', 'physician', 'nurse', 'records-officer'],
