@@ -8,6 +8,7 @@ import {
     CalendarPlus,
     Pencil,
     CircleDot,
+    History,
     Send,
     Stethoscope,
     User,
@@ -15,6 +16,7 @@ import {
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import EncounterTimeline from '@/components/encounter/EncounterTimeline.vue';
+import PatientTimeline from '@/components/patients/PatientTimeline.vue';
 import InputError from '@/components/InputError.vue';
 import ObservationChips from '@/components/observations/ObservationChips.vue';
 import ObservationHistory from '@/components/observations/ObservationHistory.vue';
@@ -30,7 +32,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { EncounterSummary, ObservationSet } from '@/types/clinical';
+import type {
+    EncounterSummary,
+    ObservationSet,
+    TimelineEntry,
+    TimelineKindOption,
+} from '@/types/clinical';
 
 type Patient = {
     id: number;
@@ -43,6 +50,11 @@ type Patient = {
     other_names: string | null;
     date_of_birth: string | null;
     date_of_birth_label: string | null;
+    dob_estimated: boolean;
+    nin: string | null;
+    ward: string | null;
+    deceased_at: string | null;
+    mother: { name: string; file_number: string; url: string } | null;
     age: number | null;
     sex: string;
     sex_label: string;
@@ -131,6 +143,7 @@ const props = defineProps<{
     canEdit: boolean;
     observationSets: ObservationSet[];
     encounters: EncounterSummary[];
+    timeline: { entries: TimelineEntry[]; kinds: TimelineKindOption[] };
     servicePoints: Array<{
         id: number;
         name: string;
@@ -139,6 +152,12 @@ const props = defineProps<{
     routeOptions: {
         priorities: Array<{ value: string; label: string }>;
         visitReasons: string[];
+        workflows: Array<{
+            id: number;
+            name: string;
+            is_default: boolean;
+            entry_points: number[];
+        }>;
     };
     canRoute: boolean;
     canBook: boolean;
@@ -157,7 +176,12 @@ defineOptions({
     },
 });
 
-const activeTab = ref('overview');
+// A link may open the chart straight onto a tab, e.g. ?tab=timeline.
+const requestedTab =
+    typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('tab')
+        : null;
+const activeTab = ref(requestedTab ?? 'overview');
 
 // The queue entry the patient is currently sitting at (waiting/in service),
 // used for the at-a-glance status on the Overview tab.
@@ -187,10 +211,24 @@ function startRouting() {
 
 const routeForm = useForm({
     service_point_id: '',
+    workflow_id: 'auto',
     assigned_to: 'none',
     priority: 'normal',
     visit_reason: props.openVisit ? '' : 'New visit',
     note: '',
+});
+
+// The pathway the engine would pick for the chosen service point, so the
+// desk sees what "automatic" means before sending the patient.
+const automaticWorkflow = computed(() => {
+    const id = Number(routeForm.service_point_id);
+    const workflows = props.routeOptions.workflows ?? [];
+
+    return (
+        workflows.find((w) => w.entry_points.includes(id)) ??
+        workflows.find((w) => w.is_default) ??
+        null
+    );
 });
 
 // Personnel eligible for the chosen destination service point.
@@ -214,6 +252,8 @@ function submitRoute() {
         .transform((data) => ({
             ...data,
             service_point_id: Number(data.service_point_id),
+            workflow_id:
+                data.workflow_id === 'auto' ? null : Number(data.workflow_id),
             assigned_to:
                 data.assigned_to === 'none' ? null : Number(data.assigned_to),
         }))
@@ -269,10 +309,18 @@ const identity = computed<Field[]>(() => [
     { label: 'Sex', value: props.patient.sex_label },
     { label: 'Marital status', value: props.patient.marital_status },
     { label: 'Nationality', value: props.patient.nationality },
+    { label: 'NIN', value: props.patient.nin },
+    {
+        label: 'Mother',
+        value: props.patient.mother
+            ? `${props.patient.mother.name} (${props.patient.mother.file_number})`
+            : null,
+    },
 ]);
 
 const contact = computed<Field[]>(() => [
     { label: 'Phone', value: props.patient.phone },
+    { label: 'Ward', value: props.patient.ward },
     { label: 'Email', value: props.patient.email },
     { label: 'Residential address', value: props.patient.address },
     { label: 'State of residence', value: props.patient.state },
@@ -343,9 +391,15 @@ const visit = computed<Field[]>(() => [
                             props.patient.age !== null
                                 ? ' · ' + props.patient.age + 'y'
                                 : ''
-                        }}
+                        }}{{ props.patient.dob_estimated ? ' (age estimated)' : '' }}
                     </p>
                     <div class="mt-2 flex flex-wrap gap-2">
+                        <span
+                            v-if="props.patient.deceased_at"
+                            class="inline-flex items-center rounded-full bg-foreground px-2 py-0.5 text-xs font-medium text-background"
+                        >
+                            Deceased · {{ props.patient.deceased_at }}
+                        </span>
                         <span
                             class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                             :class="
@@ -558,6 +612,9 @@ const visit = computed<Field[]>(() => [
         <Tabs v-model="activeTab">
             <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="timeline">
+                    <History /> Timeline
+                </TabsTrigger>
                 <TabsTrigger value="demographics">
                     <User /> Demographics
                 </TabsTrigger>
@@ -571,6 +628,18 @@ const visit = computed<Field[]>(() => [
                     <Stethoscope /> Clinical
                 </TabsTrigger>
             </TabsList>
+
+            <!-- ===== TIMELINE ===== -->
+            <TabsContent value="timeline" class="flex flex-col gap-4">
+                <p class="text-sm text-muted-foreground">
+                    Everything on record, newest first. Click a kind to hide it;
+                    double-click to show only that kind.
+                </p>
+                <PatientTimeline
+                    :entries="props.timeline.entries"
+                    :kinds="props.timeline.kinds"
+                />
+            </TabsContent>
 
             <!-- ===== OVERVIEW ===== -->
             <TabsContent value="overview" class="flex flex-col gap-6">
@@ -793,6 +862,34 @@ const visit = computed<Field[]>(() => [
                             <InputError
                                 :message="routeForm.errors.service_point_id"
                             />
+                        </div>
+
+                        <div
+                            v-if="!props.openVisit && props.routeOptions.workflows?.length"
+                            class="grid gap-1.5"
+                        >
+                            <Label>Pathway</Label>
+                            <Select v-model="routeForm.workflow_id">
+                                <SelectTrigger class="w-full bg-background">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="auto">
+                                        Automatic{{
+                                            automaticWorkflow
+                                                ? ` (${automaticWorkflow.name})`
+                                                : ''
+                                        }}
+                                    </SelectItem>
+                                    <SelectItem
+                                        v-for="w in props.routeOptions.workflows"
+                                        :key="w.id"
+                                        :value="String(w.id)"
+                                        >{{ w.name }}</SelectItem
+                                    >
+                                </SelectContent>
+                            </Select>
+                            <InputError :message="routeForm.errors.workflow_id" />
                         </div>
 
                         <div class="grid gap-1.5">

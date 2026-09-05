@@ -7,6 +7,7 @@ use App\Enums\CaseNotificationStatus;
 use App\Enums\CaseOutcome;
 use App\Enums\NotifiableDiseaseCategory;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -50,7 +51,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  */
 #[Fillable([
-    'notifiable_disease_id', 'patient_id', 'encounter_id', 'source_type', 'source_id', 'icd_code',
+    'notifiable_disease_id', 'catalogue_version_id', 'patient_id', 'encounter_id', 'source_type', 'source_id', 'icd_code',
     'category', 'case_definition', 'requires_contact_tracing', 'notification_due_at',
     'classification', 'classified_at', 'classified_by', 'onset_date', 'outcome',
     'detected_at', 'detected_by',
@@ -59,7 +60,7 @@ use Illuminate\Support\Carbon;
 ])]
 class SurveillanceCase extends Model implements AuditableRecord
 {
-    use Auditable;
+    use Auditable, HasPublicId;
 
     /**
      * Where a case stands against its notification deadline. "escalated" is
@@ -235,5 +236,15 @@ class SurveillanceCase extends Model implements AuditableRecord
     public function auditLabel(): string
     {
         return 'Surveillance case #'.$this->getKey().' ('.$this->disease->name.')';
+    }
+
+    /**
+     * The catalogue version the record was made under.
+     *
+     * @return BelongsTo<CatalogueVersion, $this>
+     */
+    public function version(): BelongsTo
+    {
+        return $this->belongsTo(CatalogueVersion::class, 'catalogue_version_id');
     }
 }

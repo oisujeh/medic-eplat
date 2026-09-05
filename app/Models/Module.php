@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+use App\Models\Contracts\AuditableRecord;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,8 +21,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property bool $is_active
  */
 #[Fillable(['name', 'slug', 'description', 'icon', 'href', 'sort_order', 'is_active'])]
-class Module extends Model
+class Module extends Model implements AuditableRecord
 {
+    use Auditable;
+
     /**
      * Get the attributes that should be cast.
      *

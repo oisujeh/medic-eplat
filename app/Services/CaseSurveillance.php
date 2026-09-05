@@ -66,6 +66,7 @@ class CaseSurveillance
 
         return SurveillanceCase::create([
             'notifiable_disease_id' => $disease->id,
+            'catalogue_version_id' => $disease->currentVersion()->id,
             'patient_id' => $patient->id,
             'encounter_id' => $encounter?->id,
             'source_type' => $source?->getMorphClass(),
@@ -120,7 +121,11 @@ class CaseSurveillance
         $changes = [];
 
         if ($case->notifiable_disease_id !== $disease->id) {
-            $changes = ['notifiable_disease_id' => $disease->id, ...$this->ruleSnapshot($disease, $case->detected_at)];
+            $changes = [
+                'notifiable_disease_id' => $disease->id,
+                'catalogue_version_id' => $disease->currentVersion()->id,
+                ...$this->ruleSnapshot($disease, $case->detected_at),
+            ];
 
             if ($case->notified_at === null) {
                 $changes['notification_status'] = $this->initialStatus($disease);
@@ -141,6 +146,14 @@ class CaseSurveillance
         }
 
         return $case;
+    }
+
+    /**
+     * The case a source record opened, if any.
+     */
+    public function caseFor(Model $source): ?SurveillanceCase
+    {
+        return SurveillanceCase::query()->whereMorphedTo('source', $source)->with('disease')->first();
     }
 
     /**

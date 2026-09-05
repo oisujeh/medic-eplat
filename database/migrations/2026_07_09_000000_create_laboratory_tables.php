@@ -20,6 +20,7 @@ return new class extends Migration
             $table->id();
             $table->string('code')->unique();                 // local / LOINC code, e.g. FBC, NA
             $table->string('name');
+            $table->foreignId('concept_id')->nullable()->constrained()->nullOnDelete();
             $table->string('department');                      // App\Enums\LabDepartment
             $table->string('specimen_type')->nullable();      // e.g. EDTA blood, Serum, Urine
             $table->string('unit')->nullable();               // e.g. g/dL
@@ -49,6 +50,7 @@ return new class extends Migration
         // A requisition — one or more tests ordered for a patient.
         Schema::create('lab_orders', function (Blueprint $table) {
             $table->id();
+            $table->ulid('ulid')->unique();
             $table->string('accession_number')->unique();
             $table->foreignId('patient_id')->constrained()->cascadeOnDelete();
             $table->foreignId('visit_id')->nullable()->constrained()->nullOnDelete();
@@ -82,6 +84,7 @@ return new class extends Migration
         Schema::table('lab_results', function (Blueprint $table) {
             $table->foreignId('lab_order_id')->nullable()->after('id')->constrained()->cascadeOnDelete();
             $table->foreignId('lab_test_id')->nullable()->after('lab_order_id')->constrained()->nullOnDelete();
+            $table->foreignId('catalogue_version_id')->nullable()->constrained()->nullOnDelete();
             $table->string('department')->nullable()->after('code');
             $table->decimal('reference_low', 12, 3)->nullable()->after('reference_range');
             $table->decimal('reference_high', 12, 3)->nullable()->after('reference_low');

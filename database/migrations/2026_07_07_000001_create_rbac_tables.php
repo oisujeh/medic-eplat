@@ -47,6 +47,15 @@ return new class extends Migration
             $table->foreignId('role_id')->constrained()->cascadeOnDelete();
             $table->primary(['module_id', 'role_id']);
         });
+
+        // The sensitive actions a role may take beneath its module access
+        // (App\Enums\Permission). A role granting all modules needs no rows.
+        Schema::create('permission_role', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('role_id')->constrained()->cascadeOnDelete();
+            $table->string('permission', 80);
+            $table->unique(['role_id', 'permission']);
+        });
     }
 
     /**
@@ -54,6 +63,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('permission_role');
         Schema::dropIfExists('module_role');
         Schema::dropIfExists('role_user');
         Schema::dropIfExists('modules');

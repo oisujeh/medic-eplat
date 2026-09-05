@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
  */
 class InventoryService
 {
+    public function __construct(private readonly AuditTrail $audit) {}
+
     /**
      * Receive stock into a new batch.
      *
@@ -46,7 +48,7 @@ class InventoryService
      */
     public function adjustBatch(StockBatch $batch, int $delta, ?string $reason, User $actor): void
     {
-        DB::transaction(function () use ($batch, $delta, $reason, $actor) {
+        DB::transaction(fn () => $this->audit->withReason($reason, function () use ($batch, $delta, $reason, $actor) {
             if ($batch->quantity + $delta < 0) {
                 throw new InsufficientStockException('Adjustment would take the batch below zero.');
             }
@@ -54,7 +56,7 @@ class InventoryService
             $batch->increment('quantity', $delta);
             $this->record($batch->item, $batch, StockMovementType::Adjustment, $delta, $actor, reason: $reason);
             $batch->item->increment('quantity_on_hand', $delta);
-        });
+        }));
     }
 
     /**

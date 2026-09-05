@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+use App\Models\Contracts\AuditableRecord;
 use Database\Factories\ProviderScheduleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,10 +24,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'provider_id', 'service_point_id', 'weekday',
     'start_time', 'end_time', 'slot_minutes', 'is_active',
 ])]
-class ProviderSchedule extends Model
+class ProviderSchedule extends Model implements AuditableRecord
 {
     /** @use HasFactory<ProviderScheduleFactory> */
-    use HasFactory;
+    use Auditable, HasFactory;
 
     /**
      * Get the attributes that should be cast.

@@ -17,7 +17,10 @@ use Illuminate\Validation\ValidationException;
 
 class AppointmentService
 {
-    public function __construct(private readonly PatientFlowService $flow) {}
+    public function __construct(
+        private readonly PatientFlowService $flow,
+        private readonly AuditTrail $audit,
+    ) {}
 
     /**
      * Bookable slots for a provider on a given day, each flagged available or
@@ -166,12 +169,12 @@ class AppointmentService
     {
         abort_unless($appointment->status->isOpen(), 422);
 
-        $appointment->update([
+        $this->audit->withReason($reason, fn () => $appointment->update([
             'status' => AppointmentStatus::Cancelled,
             'cancelled_by' => $actor->id,
             'cancelled_at' => now(),
             'cancellation_reason' => $reason,
-        ]);
+        ]));
 
         return $appointment;
     }

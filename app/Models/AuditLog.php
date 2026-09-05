@@ -21,6 +21,7 @@ use LogicException;
  * @property int|null $patient_id
  * @property array<string, mixed>|null $old_values
  * @property array<string, mixed>|null $new_values
+ * @property string|null $reason
  * @property string|null $ip_address
  * @property string|null $user_agent
  * @property string|null $route
@@ -46,6 +47,10 @@ class AuditLog extends Model
 
     public const ACTION_LOGIN_FAILED = 'login_failed';
 
+    public const ACTION_IMPORTED = 'imported';
+
+    public const ACTION_MERGED = 'merged';
+
     /**
      * Every action the trail records, in display order.
      *
@@ -57,6 +62,8 @@ class AuditLog extends Model
         self::ACTION_UPDATED,
         self::ACTION_DELETED,
         self::ACTION_EXPORTED,
+        self::ACTION_IMPORTED,
+        self::ACTION_MERGED,
         self::ACTION_LOGIN,
         self::ACTION_LOGOUT,
         self::ACTION_LOGIN_FAILED,

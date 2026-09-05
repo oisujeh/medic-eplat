@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\LabOrderStatus;
 use App\Enums\Priority;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
 use Database\Factories\LabOrderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -46,7 +47,7 @@ use Illuminate\Support\Carbon;
 class LabOrder extends Model implements AuditableRecord
 {
     /** @use HasFactory<LabOrderFactory> */
-    use Auditable, HasFactory;
+    use Auditable, HasFactory, HasPublicId;
 
     /**
      * Get the attributes that should be cast.

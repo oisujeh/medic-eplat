@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -28,7 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_active
  */
 #[Fillable([
-    'code', 'name', 'category', 'form', 'strength', 'unit', 'cost_price',
+    'concept_id', 'code', 'name', 'category', 'form', 'strength', 'unit', 'cost_price',
     'selling_price', 'reorder_level', 'quantity_on_hand', 'is_active',
 ])]
 class InventoryItem extends Model implements AuditableRecord
@@ -129,5 +130,15 @@ class InventoryItem extends Model implements AuditableRecord
     protected function lowStock(Builder $query): void
     {
         $query->whereColumn('quantity_on_hand', '<=', 'reorder_level');
+    }
+
+    /**
+     * The terminology concept this entry is coded to, when it is.
+     *
+     * @return BelongsTo<Concept, $this>
+     */
+    public function concept(): BelongsTo
+    {
+        return $this->belongsTo(Concept::class);
     }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Search, UserPlus } from '@lucide/vue';
+import { Search, UserPlus, Users } from '@lucide/vue';
 import { watchDebounced } from '@vueuse/core';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,7 @@ const props = defineProps<{
     patients: Paginated<PatientRow>;
     filters: { search: string };
     canRegister: boolean;
+    duplicatesPending: number;
 }>();
 
 defineOptions({
@@ -69,12 +70,25 @@ watchDebounced(
                     registered patient{{ props.patients.total === 1 ? '' : 's' }}
                 </p>
             </div>
-            <Button v-if="props.canRegister" as-child>
-                <Link href="/registration">
-                    <UserPlus class="size-4" />
-                    Register patient
-                </Link>
-            </Button>
+            <div class="flex flex-wrap items-center gap-2">
+                <Button
+                    v-if="props.canRegister && props.duplicatesPending > 0"
+                    variant="outline"
+                    as-child
+                >
+                    <Link href="/patients/duplicates">
+                        <Users class="size-4" />
+                        Review {{ props.duplicatesPending }} possible
+                        duplicate{{ props.duplicatesPending === 1 ? '' : 's' }}
+                    </Link>
+                </Button>
+                <Button v-if="props.canRegister" as-child>
+                    <Link href="/registration">
+                        <UserPlus class="size-4" />
+                        Register patient
+                    </Link>
+                </Button>
+            </div>
         </div>
 
         <div class="relative max-w-sm">

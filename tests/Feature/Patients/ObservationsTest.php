@@ -61,7 +61,8 @@ function recordFromQueue(User $nurse, QueueEntry $entry, array $readings)
 
 test('a nurse can record vitals from the queue and BMI is derived', function () {
     $nurse = obsUser(['nurse']);
-    $entry = inServiceEntry('triage', $nurse);
+    // An adult, so the readings below sit inside the adult reference bands.
+    $entry = inServiceEntry('triage', $nurse, Patient::factory()->create(['date_of_birth' => now()->subYears(34)->toDateString()]));
 
     recordFromQueue($nurse, $entry, [
         'temperature' => 37.2,
@@ -171,7 +172,8 @@ test('abnormal readings are flagged with a severity level', function () {
 
 test('normal readings carry no flags', function () {
     $nurse = obsUser(['nurse']);
-    $entry = inServiceEntry('triage', $nurse);
+    // An adult, so the readings below sit inside the adult reference bands.
+    $entry = inServiceEntry('triage', $nurse, Patient::factory()->create(['date_of_birth' => now()->subYears(40)->toDateString()]));
 
     recordFromQueue($nurse, $entry, [
         'temperature' => 36.8,

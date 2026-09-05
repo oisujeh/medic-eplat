@@ -16,6 +16,7 @@ return new class extends Migration
     {
         Schema::create('pregnancies', function (Blueprint $table) {
             $table->id();
+            $table->ulid('ulid')->unique();
             $table->string('pregnancy_number')->unique();
             $table->foreignId('patient_id')->constrained()->cascadeOnDelete();
             $table->string('status', 20)->default('active');

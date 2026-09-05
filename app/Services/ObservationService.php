@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\AlertLevel;
 use App\Enums\ObservationCode;
+use App\Events\ObservationRecorded;
 use App\Models\Admission;
 use App\Models\Encounter;
 use App\Models\ObservationSet;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ObservationService
 {
+    public function __construct(private readonly DomainEvents $events) {}
+
     /**
      * Record a set of readings. `$values` is keyed by ObservationCode value;
      * blank entries are ignored. The context (queue entry, encounter or
@@ -84,8 +87,11 @@ class ObservationService
             }
 
             $set->update(['alert_level' => $worst]);
+            $set->load('observations', 'recordedBy:id,name');
 
-            return $set->load('observations', 'recordedBy:id,name');
+            $this->events->publish(new ObservationRecorded($set, $actor));
+
+            return $set;
         });
     }
 

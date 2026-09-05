@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\NumberKind;
 use App\Enums\Priority;
 use App\Enums\QueueStatus;
 use App\Enums\VisitStatus;
@@ -10,11 +11,16 @@ use App\Models\QueueEntry;
 use App\Models\ServicePoint;
 use App\Models\User;
 use App\Models\Visit;
+use App\Models\Workflow;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class PatientFlowService
 {
+    public function __construct(
+        private readonly NumberSequences $numbers,
+        private readonly WorkflowEngine $workflows,
+    ) {}
+
     /**
      * Route a patient to a service point, opening a visit if one is not active.
      *
@@ -28,9 +34,10 @@ class PatientFlowService
         ?string $note = null,
         ?string $visitReason = null,
         ?User $assignedTo = null,
+        ?Workflow $workflow = null,
     ): QueueEntry {
-        return DB::transaction(function () use ($patient, $servicePoint, $actor, $priority, $note, $visitReason, $assignedTo) {
-            $visit = $patient->openVisit() ?? $this->openVisit($patient, $actor, $visitReason);
+        return DB::transaction(function () use ($patient, $servicePoint, $actor, $priority, $note, $visitReason, $assignedTo, $workflow) {
+            $visit = $patient->openVisit() ?? $this->openVisit($patient, $actor, $visitReason, $this->workflows->forEntry($servicePoint, $workflow));
 
             return $this->pushEntry($visit, $servicePoint, $actor, $priority, $note, $assignedTo);
         });
@@ -125,9 +132,11 @@ class PatientFlowService
     public function closeVisit(Visit $visit, User $actor): Visit
     {
         return DB::transaction(function () use ($visit, $actor) {
+            // One model save per entry, so each cancellation is audited.
             $visit->queueEntries()
                 ->whereIn('status', [QueueStatus::Waiting, QueueStatus::InService])
-                ->update(['status' => QueueStatus::Cancelled]);
+                ->get()
+                ->each(fn (QueueEntry $entry) => $entry->update(['status' => QueueStatus::Cancelled]));
 
             $visit->update([
                 'status' => VisitStatus::Closed,
@@ -146,26 +155,26 @@ class PatientFlowService
      */
     public function ensureOpenVisit(Patient $patient, User $actor, ?string $reason = null): Visit
     {
-        return $patient->openVisit() ?? $this->openVisit($patient, $actor, $reason);
+        return $patient->openVisit() ?? $this->openVisit($patient, $actor, $reason, null);
     }
 
     /**
      * Open a new visit for a patient, generating a human-readable visit number.
      */
-    protected function openVisit(Patient $patient, User $actor, ?string $reason): Visit
+    protected function openVisit(Patient $patient, User $actor, ?string $reason, ?Workflow $workflow): Visit
     {
         $visit = new Visit;
         $visit->patient_id = $patient->id;
         $visit->status = VisitStatus::Open;
+
+        if ($workflow !== null) {
+            $visit->workflow()->associate($workflow);
+        }
         $visit->reason = $reason;
         $visit->opened_by = $actor->id;
         $visit->opened_at = now();
-        $visit->visit_number = 'TMP-'.Str::uuid();
+        $visit->visit_number = $this->numbers->next(NumberKind::Visit, $visit->opened_at->year);
         $visit->save();
-
-        $visit->update([
-            'visit_number' => sprintf('V/%d/%06d', $visit->opened_at->year, $visit->id),
-        ]);
 
         return $visit;
     }
@@ -185,6 +194,7 @@ class PatientFlowService
             'visit_id' => $visit->id,
             'patient_id' => $visit->patient_id,
             'service_point_id' => $servicePoint->id,
+            'workflow_stage_id' => $this->workflows->stageFor($visit, $servicePoint)?->id,
             'status' => QueueStatus::Waiting,
             'priority' => $priority,
             'note' => $note,

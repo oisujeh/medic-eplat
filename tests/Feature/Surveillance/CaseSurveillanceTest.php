@@ -537,7 +537,8 @@ test('the case screen shows the patient contact details the DSNO will need', fun
 });
 
 test('the notifiable disease catalogue can be browsed and a disease switched off', function () {
-    $physician = idsrUser();
+    // Switching a disease off is configuration, held by the CMD rather than every clinician.
+    $physician = idsrUser(['chief-medical-director']);
 
     actingAs($physician)
         ->get(route('surveillance.diseases.index'))

@@ -41,14 +41,17 @@ const props = defineProps<{
         first_name: string;
         other_names: string;
         date_of_birth: string;
+        dob_estimated: boolean;
         sex: string;
         marital_status: string;
+        nin: string;
         phone: string;
         email: string;
         address: string;
         nationality: string;
         state: string;
         lga: string;
+        ward: string;
         next_of_kin_name: string;
         next_of_kin_relationship: string;
         next_of_kin_phone: string;
@@ -90,14 +93,17 @@ const form = useForm({
     first_name: props.patient.first_name,
     other_names: props.patient.other_names,
     date_of_birth: props.patient.date_of_birth,
+    dob_estimated: props.patient.dob_estimated,
     sex: props.patient.sex,
     marital_status: props.patient.marital_status,
+    nin: props.patient.nin,
     phone: props.patient.phone,
     email: props.patient.email,
     address: props.patient.address,
     nationality: props.patient.nationality,
     state: props.patient.state,
     lga: props.patient.lga,
+    ward: props.patient.ward,
     next_of_kin_name: props.patient.next_of_kin_name,
     next_of_kin_relationship: props.patient.next_of_kin_relationship,
     next_of_kin_phone: props.patient.next_of_kin_phone,
@@ -265,7 +271,31 @@ function submit() {
                             v-model="form.date_of_birth"
                             type="date"
                         />
+                        <label
+                            class="flex items-center gap-2 text-xs text-muted-foreground"
+                        >
+                            <Checkbox
+                                id="dob_estimated"
+                                :model-value="form.dob_estimated"
+                                @update:model-value="
+                                    (v) => (form.dob_estimated = v === true)
+                                "
+                            />
+                            Estimated from the patient's age
+                        </label>
                         <InputError :message="form.errors.date_of_birth" />
+                    </div>
+
+                    <div class="grid gap-1.5">
+                        <Label for="nin">NIN</Label>
+                        <Input
+                            id="nin"
+                            v-model="form.nin"
+                            inputmode="numeric"
+                            maxlength="11"
+                            autocomplete="off"
+                        />
+                        <InputError :message="form.errors.nin" />
                     </div>
 
                     <div class="grid gap-1.5">
@@ -343,7 +373,7 @@ function submit() {
                         <InputError :message="form.errors.nationality" />
                     </div>
 
-                    <div class="grid gap-1.5 sm:col-span-2 lg:col-span-3">
+                    <div class="grid gap-1.5 sm:col-span-2">
                         <Label for="address">Residential address</Label>
                         <Input
                             id="address"
@@ -351,6 +381,12 @@ function submit() {
                             autocomplete="off"
                         />
                         <InputError :message="form.errors.address" />
+                    </div>
+
+                    <div class="grid gap-1.5">
+                        <Label for="ward">Ward</Label>
+                        <Input id="ward" v-model="form.ward" autocomplete="off" />
+                        <InputError :message="form.errors.ward" />
                     </div>
 
                     <div class="grid gap-1.5">

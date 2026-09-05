@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EncounterType;
 use App\Enums\PregnancyStatus;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
 use Carbon\CarbonInterface;
 use Database\Factories\PregnancyFactory;
@@ -45,7 +46,7 @@ use Illuminate\Support\Carbon;
 class Pregnancy extends Model implements AuditableRecord
 {
     /** @use HasFactory<PregnancyFactory> */
-    use Auditable, HasFactory;
+    use Auditable, HasFactory, HasPublicId;
 
     /** Days from the last menstrual period to the expected date of delivery. */
     public const GESTATION_DAYS = 280;

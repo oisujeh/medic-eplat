@@ -46,6 +46,9 @@ return new class extends Migration
             // attributes that changed.
             $table->json('old_values')->nullable();
             $table->json('new_values')->nullable();
+            // Why, when the action carried a reason: a cancellation, an
+            // adjustment, a rejection.
+            $table->string('reason', 500)->nullable();
 
             // Request context.
             $table->string('ip_address', 45)->nullable();

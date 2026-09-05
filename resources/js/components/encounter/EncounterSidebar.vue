@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import { AlertTriangle, ChevronRight } from '@lucide/vue';
 import { computed } from 'vue';
 import ObservationTiles from '@/components/observations/ObservationTiles.vue';
+import PatientTimeline from '@/components/patients/PatientTimeline.vue';
 import type {
     Allergy,
     LabResult,
@@ -10,6 +11,7 @@ import type {
     ObservationSet,
     PatientAlert,
     Problem,
+    TimelineEntry,
 } from '@/types/clinical';
 
 const props = defineProps<{
@@ -19,6 +21,8 @@ const props = defineProps<{
     problems: Problem[];
     medications: Medication[];
     labResults: LabResult[];
+    /** The patient's most recent history, for the sidebar digest. */
+    timeline?: TimelineEntry[];
     patientUrl: string;
     /** Stage keys the "View all" links jump to. */
     stages: { problems?: string; medications?: string; labs?: string };
@@ -258,6 +262,27 @@ defineExpose({ safetyAlerts });
             <p v-else class="text-sm text-muted-foreground">
                 No lab results available.
             </p>
+        </section>
+
+        <section
+            v-if="props.timeline"
+            class="rounded-xl border border-border bg-card p-4"
+        >
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold">History</h2>
+                <Link
+                    :href="`${patientUrl}?tab=timeline`"
+                    class="text-xs font-medium text-primary hover:underline"
+                >
+                    Full timeline
+                </Link>
+            </div>
+            <PatientTimeline
+                :entries="props.timeline"
+                :kinds="[]"
+                compact
+                empty-text="No earlier history on record."
+            />
         </section>
     </aside>
 </template>

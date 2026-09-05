@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -28,7 +29,7 @@ use Illuminate\Support\Carbon;
 ])]
 class Dispense extends Model implements AuditableRecord
 {
-    use Auditable;
+    use Auditable, HasPublicId;
 
     public const STATUS_DISPENSED = 'dispensed';
 

@@ -16,6 +16,7 @@ return new class extends Migration
     {
         Schema::create('referrals', function (Blueprint $table) {
             $table->id();
+            $table->ulid('ulid')->unique();
             $table->string('referral_number', 20)->unique();
             $table->foreignId('patient_id')->constrained()->restrictOnDelete();
             $table->foreignId('encounter_id')->nullable()->constrained()->nullOnDelete();

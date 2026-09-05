@@ -2,6 +2,7 @@
 import { router, useForm } from '@inertiajs/vue3';
 import { Pencil, Pill, Plus, Trash2 } from '@lucide/vue';
 import { ref } from 'vue';
+import ConceptPicker from '@/components/clinical-record/ConceptPicker.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,13 @@ const props = defineProps<{
     disabled?: boolean;
 }>();
 
-const form = useForm({ name: '', dose: '', frequency: '', route: '' });
+const form = useForm({
+    name: '',
+    concept_id: null as number | null,
+    dose: '',
+    frequency: '',
+    route: '',
+});
 const editingId = ref<number | null>(null);
 
 function submit() {
@@ -34,6 +41,7 @@ function submit() {
 function edit(m: Medication) {
     editingId.value = m.id;
     form.name = m.name;
+    form.concept_id = m.concept_id;
     form.dose = m.dose ?? '';
     form.frequency = m.frequency ?? '';
     form.route = m.route ?? '';
@@ -67,7 +75,12 @@ function remove(id: number) {
         >
             <div class="grid gap-1.5 sm:col-span-3">
                 <Label>Medication *</Label>
-                <Input v-model="form.name" placeholder="e.g. Amlodipine" />
+                <ConceptPicker
+                    v-model="form.name"
+                    v-model:concept-id="form.concept_id"
+                    concept-class="drug"
+                    placeholder="e.g. Amlodipine"
+                />
                 <InputError :message="form.errors.name" />
             </div>
             <div class="grid gap-1.5">

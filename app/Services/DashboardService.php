@@ -20,6 +20,7 @@ use App\Models\Encounter;
 use App\Models\InventoryItem;
 use App\Models\LabOrder;
 use App\Models\Patient;
+use App\Models\PatientMatchCandidate;
 use App\Models\Payment;
 use App\Models\QueueEntry;
 use App\Models\ServicePoint;
@@ -127,7 +128,7 @@ class DashboardService
         }
 
         if ($has('registration')) {
-            $add('registrations_today', 'Registered today', Patient::query()->whereBetween('created_at', $this->today())->count(), 'UserPlus', '/patients', 'New patient folders');
+            $add('registrations_today', 'Registered today', Patient::query()->current()->whereBetween('created_at', $this->today())->count(), 'UserPlus', '/patients', 'New patient folders');
         }
 
         if ($has('queues')) {
@@ -486,7 +487,7 @@ class DashboardService
         return [
             'period' => Carbon::today()->isoFormat('MMMM YYYY'),
             'visits' => Visit::query()->whereBetween('opened_at', [$from, $to])->count(),
-            'new_patients' => Patient::query()->whereBetween('created_at', [$from, $to])->count(),
+            'new_patients' => Patient::query()->current()->whereBetween('created_at', [$from, $to])->count(),
             'consultations' => Encounter::consultations()->signed()->whereBetween('signed_at', [$from, $to])->count(),
             'revenue' => round((float) Payment::query()->whereBetween('created_at', [$from, $to])->sum('amount'), 2),
             'outstanding' => round($this->reports->outstandingBalance(), 2),
@@ -560,6 +561,11 @@ class DashboardService
         if ($has('surveillance')) {
             $pending = SurveillanceCase::query()->awaitingNotification()->count();
             $alert('notifiable_cases', 'Notifiable cases awaiting DSNO', 'IDSR cases to notify within 24 hours', $pending, 'red', '/surveillance?status=pending');
+        }
+
+        if ($has('registration')) {
+            $duplicates = PatientMatchCandidate::query()->pending()->count();
+            $alert('possible_duplicates', 'Possible duplicate records', 'Record pairs to merge or dismiss', $duplicates, 'amber', '/patients/duplicates');
         }
 
         if ($has('inventory', 'pharmacy')) {

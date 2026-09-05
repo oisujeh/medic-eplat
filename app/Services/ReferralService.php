@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\NumberKind;
 use App\Enums\Priority;
 use App\Enums\ReferralStatus;
 use App\Models\Allergy;
@@ -22,7 +23,10 @@ use Illuminate\Validation\ValidationException;
  */
 class ReferralService
 {
-    public function __construct(private readonly FacilitySettings $facility) {}
+    public function __construct(
+        private readonly FacilitySettings $facility,
+        private readonly NumberSequences $numbers,
+    ) {}
 
     /**
      * What the referral form is pre-filled with from the encounter: the
@@ -65,7 +69,7 @@ class ReferralService
     {
         return DB::transaction(function () use ($encounter, $actor, $data) {
             return Referral::create([
-                'referral_number' => $this->nextNumber(),
+                'referral_number' => $this->numbers->next(NumberKind::Referral),
                 'patient_id' => $encounter->patient_id,
                 'encounter_id' => $encounter->id,
                 'referred_by' => $actor->id,
@@ -187,23 +191,5 @@ class ReferralService
         $referral->update(['printed_at' => now()]);
 
         return $dompdf->output();
-    }
-
-    /**
-     * The next referral number, REF/YYYY/000001, sequential within the year.
-     */
-    private function nextNumber(): string
-    {
-        $year = now()->year;
-
-        $last = Referral::query()
-            ->where('referral_number', 'like', "REF/{$year}/%")
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->value('referral_number');
-
-        $sequence = $last ? ((int) substr($last, -6)) + 1 : 1;
-
-        return sprintf('REF/%d/%06d', $year, $sequence);
     }
 }

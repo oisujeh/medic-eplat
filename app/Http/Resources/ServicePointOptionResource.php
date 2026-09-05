@@ -22,6 +22,8 @@ class ServicePointOptionResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            // Set by the workflow engine on the step the pathway suggests.
+            'is_default' => (bool) ($this->getAttribute('is_default') ?? false),
             'personnel' => $this->eligiblePersonnel()
                 ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
                 ->values(),

@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ConceptClass;
+use App\Events\MedicationPrescribed;
 use App\Http\Controllers\Concerns\AssertsEncounterRecord;
 use App\Http\Requests\MedicationRequest;
 use App\Models\Encounter;
 use App\Models\Medication;
+use App\Services\DomainEvents;
+use App\Services\Terminology;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,16 +24,21 @@ class MedicationController extends Controller
     /**
      * Prescribe a medication.
      */
-    public function store(MedicationRequest $request, Encounter $encounter): RedirectResponse
+    public function store(MedicationRequest $request, Encounter $encounter, DomainEvents $events, Terminology $terminology): RedirectResponse
     {
-        $encounter->patient->medications()->create([
-            ...$request->validated(),
+        $data = $request->validated();
+
+        $medication = $encounter->patient->medications()->create([
+            ...$data,
+            'concept_id' => $terminology->code(ConceptClass::Drug, $data['concept_id'] ?? null, $data['name']),
             'status' => Medication::STATUS_ACTIVE,
             'visit_id' => $encounter->visit_id,
             'encounter_id' => $encounter->id,
             'prescribed_by' => $request->user()->id,
             'started_at' => now(),
         ]);
+
+        $events->publish(new MedicationPrescribed($medication, $request->user()));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Medication prescribed.']);
 
@@ -39,11 +48,16 @@ class MedicationController extends Controller
     /**
      * Update an existing medication.
      */
-    public function update(MedicationRequest $request, Encounter $encounter, Medication $medication): RedirectResponse
+    public function update(MedicationRequest $request, Encounter $encounter, Medication $medication, Terminology $terminology): RedirectResponse
     {
         $this->assertBelongsToPatient($encounter, $medication);
 
-        $medication->update($request->validated());
+        $data = $request->validated();
+
+        $medication->update([
+            ...$data,
+            'concept_id' => $terminology->code(ConceptClass::Drug, $data['concept_id'] ?? null, $data['name']),
+        ]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Medication updated.']);
 

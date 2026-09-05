@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { router, useForm } from '@inertiajs/vue3';
 import { Plus, X } from '@lucide/vue';
+import ConceptPicker from '@/components/clinical-record/ConceptPicker.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +33,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
 
 const form = useForm({
     substance: '',
+    concept_id: null as number | null,
     category: '',
     reaction: '',
     severity: '',
@@ -115,8 +117,10 @@ function remove(id: number) {
             >
                 <div class="grid gap-1.5 sm:col-span-2">
                     <Label>Substance *</Label>
-                    <Input
+                    <ConceptPicker
                         v-model="form.substance"
+                        v-model:concept-id="form.concept_id"
+                        concept-class="allergen"
                         placeholder="e.g. Penicillin"
                     />
                     <InputError :message="form.errors.substance" />

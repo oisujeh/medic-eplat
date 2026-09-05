@@ -6,6 +6,7 @@ use App\Enums\EncounterOutcome;
 use App\Enums\EncounterStatus;
 use App\Enums\EncounterType;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
 use Database\Factories\EncounterFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -52,7 +53,7 @@ use Illuminate\Support\Carbon;
 class Encounter extends Model implements AuditableRecord
 {
     /** @use HasFactory<EncounterFactory> */
-    use Auditable, HasFactory;
+    use Auditable, HasFactory, HasPublicId;
 
     /**
      * The narrative fields a clinician documents.

@@ -25,7 +25,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'bill_id', 'source', 'description', 'quantity', 'unit_price', 'total',
-    'reference_type', 'reference_id', 'created_by',
+    'reference_type', 'reference_id', 'catalogue_version_id', 'created_by',
 ])]
 class BillCharge extends Model implements AuditableRecord
 {
@@ -78,5 +78,15 @@ class BillCharge extends Model implements AuditableRecord
     public function auditPatientId(): ?int
     {
         return $this->bill?->patient_id;
+    }
+
+    /**
+     * The catalogue version the record was made under.
+     *
+     * @return BelongsTo<CatalogueVersion, $this>
+     */
+    public function version(): BelongsTo
+    {
+        return $this->belongsTo(CatalogueVersion::class, 'catalogue_version_id');
     }
 }

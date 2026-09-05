@@ -15,6 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import PossibleMatches from '@/components/patients/PossibleMatches.vue';
 import statesData from '@/data/state_lga.json';
 
 type StateEntry = { state: string; alias: string; lgas: string[] };
@@ -55,14 +56,17 @@ const form = useForm({
     first_name: '',
     other_names: '',
     date_of_birth: '',
+    dob_estimated: false,
     sex: '',
     marital_status: '',
+    nin: '',
     phone: '',
     email: '',
     address: '',
     nationality: 'Nigerian',
     state: '',
     lga: '',
+    ward: '',
     next_of_kin_name: '',
     next_of_kin_relationship: '',
     next_of_kin_phone: '',
@@ -115,6 +119,16 @@ watch(
         }
     },
 );
+// What the Master Patient Index check watches while the registrar types.
+const identity = computed(() => ({
+    nin: form.nin,
+    phone: form.phone,
+    surname: form.surname,
+    first_name: form.first_name,
+    date_of_birth: form.date_of_birth,
+    sex: form.sex,
+}));
+
 const isOutpatient = computed(() => form.visit_category === 'Outpatient');
 const isOtherService = computed(
     () => isOutpatient.value && form.outpatient_service === 'Other',
@@ -182,6 +196,7 @@ function submit() {
                     <h2 class="mb-4 text-sm font-semibold text-foreground">
                         Patient identity
                     </h2>
+                    <PossibleMatches :details="identity" class="mb-4" />
                     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <div class="grid gap-1.5">
                             <Label for="title">Title</Label>
@@ -241,7 +256,32 @@ function submit() {
                                 type="date"
                                 v-model="form.date_of_birth"
                             />
+                            <label
+                                class="flex items-center gap-2 text-xs text-muted-foreground"
+                            >
+                                <Checkbox
+                                    id="dob_estimated"
+                                    :model-value="form.dob_estimated"
+                                    @update:model-value="
+                                        (v) => (form.dob_estimated = v === true)
+                                    "
+                                />
+                                Estimated from the patient's age
+                            </label>
                             <InputError :message="form.errors.date_of_birth" />
+                        </div>
+
+                        <div class="grid gap-1.5">
+                            <Label for="nin">NIN</Label>
+                            <Input
+                                id="nin"
+                                v-model="form.nin"
+                                inputmode="numeric"
+                                maxlength="11"
+                                autocomplete="off"
+                                placeholder="11-digit National Identification Number"
+                            />
+                            <InputError :message="form.errors.nin" />
                         </div>
 
                         <div class="grid gap-1.5">
@@ -324,7 +364,7 @@ function submit() {
                             <InputError :message="form.errors.nationality" />
                         </div>
 
-                        <div class="grid gap-1.5 sm:col-span-2 lg:col-span-3">
+                        <div class="grid gap-1.5 sm:col-span-2">
                             <Label for="address">Residential address</Label>
                             <Input
                                 id="address"
@@ -333,6 +373,17 @@ function submit() {
                                 placeholder="House number, street, area"
                             />
                             <InputError :message="form.errors.address" />
+                        </div>
+
+                        <div class="grid gap-1.5">
+                            <Label for="ward">Ward</Label>
+                            <Input
+                                id="ward"
+                                v-model="form.ward"
+                                autocomplete="off"
+                                placeholder="Political ward within the LGA"
+                            />
+                            <InputError :message="form.errors.ward" />
                         </div>
 
                         <div class="grid gap-1.5">

@@ -38,7 +38,9 @@ return new class extends Migration
 
         Schema::create('surveillance_cases', function (Blueprint $table) {
             $table->id();
+            $table->ulid('ulid')->unique();
             $table->foreignId('notifiable_disease_id')->constrained()->restrictOnDelete();
+            $table->foreignId('catalogue_version_id')->nullable()->constrained()->nullOnDelete();
             // A case is part of the legal surveillance record: it outlives nothing.
             $table->foreignId('patient_id')->constrained()->restrictOnDelete();
             $table->foreignId('encounter_id')->nullable()->constrained()->nullOnDelete();

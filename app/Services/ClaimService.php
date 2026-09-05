@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ClaimBatchStatus;
 use App\Enums\ClaimStatus;
+use App\Enums\NumberKind;
 use App\Enums\PaymentMethod;
 use App\Models\Bill;
 use App\Models\BillCharge;
@@ -24,7 +25,11 @@ use Illuminate\Validation\ValidationException;
  */
 class ClaimService
 {
-    public function __construct(private readonly BillingService $billing) {}
+    public function __construct(
+        private readonly BillingService $billing,
+        private readonly NumberSequences $numbers,
+        private readonly AuditTrail $audit,
+    ) {}
 
     /**
      * Raise a draft claim for the charges on a bill that are not yet claimed.
@@ -62,7 +67,7 @@ class ClaimService
 
         return DB::transaction(function () use ($bill, $patient, $payer, $charges, $actor) {
             $claim = Claim::create([
-                'claim_number' => 'TMP-'.$bill->id.'-'.now()->timestamp,
+                'claim_number' => $this->numbers->next(NumberKind::Claim),
                 'patient_id' => $patient->id,
                 'payer_id' => $payer->id,
                 'bill_id' => $bill->id,
@@ -74,8 +79,6 @@ class ClaimService
                 'diagnosis' => $this->diagnosisFor($bill),
                 'created_by' => $actor->id,
             ]);
-
-            $claim->update(['claim_number' => sprintf('CLM/%d/%06d', now()->year, $claim->id)]);
 
             foreach ($charges as $charge) {
                 $claim->lines()->create($this->lineFor($charge, $payer));
@@ -203,10 +206,10 @@ class ClaimService
     {
         $this->assertStatus($claim, [ClaimStatus::Submitted, ClaimStatus::PartiallyPaid], 'Only a submitted claim can be rejected.');
 
-        $claim->update([
+        $this->audit->withReason($reason, fn () => $claim->update([
             'status' => ClaimStatus::Rejected,
             'rejection_reason' => $reason,
-        ]);
+        ]));
 
         return $claim;
     }
@@ -221,7 +224,10 @@ class ClaimService
         DB::transaction(function () use ($claim) {
             $bill = $claim->bill;
 
-            Payment::query()->whereIn('id', array_filter([$claim->hmo_payment_id, $claim->waiver_payment_id]))->delete();
+            Payment::query()
+                ->whereIn('id', array_filter([$claim->hmo_payment_id, $claim->waiver_payment_id]))
+                ->get()
+                ->each(fn (Payment $payment) => $payment->delete());
 
             $claim->delete();
 

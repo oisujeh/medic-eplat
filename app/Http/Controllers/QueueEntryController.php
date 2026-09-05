@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\Priority;
 use App\Models\QueueEntry;
 use App\Models\ServicePoint;
+use App\Services\AuditTrail;
 use App\Services\PatientFlowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,10 @@ use Inertia\Inertia;
  */
 class QueueEntryController extends Controller
 {
-    public function __construct(private readonly PatientFlowService $flow) {}
+    public function __construct(
+        private readonly PatientFlowService $flow,
+        private readonly AuditTrail $audit,
+    ) {}
 
     /**
      * Hand the entry to a named staff member, or back to the unassigned pool.
@@ -91,7 +95,10 @@ class QueueEntryController extends Controller
 
         $validated = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
 
-        $this->flow->cancel($entry, $request->user(), $validated['reason'] ?? null);
+        $this->audit->withReason(
+            $validated['reason'] ?? null,
+            fn () => $this->flow->cancel($entry, $request->user(), $validated['reason'] ?? null),
+        );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Queue entry cancelled.']);
 

@@ -2,14 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\NumberKind;
+use App\Events\PatientRegistered;
+use App\Events\PatientUpdated;
 use App\Http\Requests\StorePatientRequest;
 use App\Http\Requests\UpdatePatientRequest;
 use App\Models\Patient;
 use App\Models\Payer;
+use App\Services\DomainEvents;
+use App\Services\NumberSequences;
+use App\Services\PatientIdentifiers;
+use App\Support\MatchResult;
 use App\Support\PatientOptions;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -36,21 +44,18 @@ class PatientRegistrationController extends Controller
     /**
      * Store a newly registered patient.
      */
-    public function store(StorePatientRequest $request): RedirectResponse
+    public function store(StorePatientRequest $request, NumberSequences $numbers, DomainEvents $events): RedirectResponse
     {
-        $patient = DB::transaction(function () use ($request) {
+        $patient = DB::transaction(function () use ($request, $numbers, $events) {
             $patient = new Patient;
             $patient->fill($request->validated());
             $this->applyCoverage($patient);
             $patient->registered_by = $request->user()->id;
-            // file_number is system-generated (not mass-assignable); a temporary
-            // unique value satisfies the NOT NULL/unique constraint until the id
-            // is known, then it is replaced with the human-readable number.
-            $patient->file_number = 'TMP-'.Str::uuid();
+            // The file number is issued by the facility's series, not typed.
+            $patient->file_number = $numbers->next(NumberKind::Patient);
             $patient->save();
 
-            $patient->file_number = sprintf('MEP/%d/%06d', $patient->created_at->year, $patient->id);
-            $patient->save();
+            $events->publish(new PatientRegistered($patient, $request->user()));
 
             return $patient;
         });
@@ -66,6 +71,39 @@ class PatientRegistrationController extends Controller
     /**
      * Show the form for revising a patient's demographics and coverage.
      */
+    /**
+     * The Master Patient Index check: people the typed details could already
+     * describe, for the registration and edit forms.
+     */
+    public function lookup(Request $request, PatientIdentifiers $index): JsonResponse
+    {
+        $except = $request->integer('except') > 0 ? Patient::find($request->integer('except')) : null;
+
+        $candidates = $index->candidates([
+            'nin' => $request->string('nin')->toString(),
+            'phone' => $request->string('phone')->toString(),
+            'surname' => $request->string('surname')->toString(),
+            'first_name' => $request->string('first_name')->toString(),
+            'date_of_birth' => $request->string('date_of_birth')->toString(),
+            'sex' => $request->string('sex')->toString(),
+        ], $except);
+
+        return response()->json($candidates->map(fn (MatchResult $match) => [
+            'id' => $match->patient->id,
+            'file_number' => $match->patient->file_number,
+            'name' => $match->patient->fullName(),
+            'sex' => $match->patient->sex,
+            'age' => $match->patient->age(),
+            'phone' => $match->patient->phone,
+            'lga' => $match->patient->lga,
+            'score' => $match->score,
+            'level' => $match->level->value,
+            'reasons' => $match->reasons(),
+            'strong' => $match->level->isQueued(),
+            'url' => route('patients.show', $match->patient),
+        ])->values());
+    }
+
     public function edit(Patient $patient): Response
     {
         return Inertia::render('patients/Edit', [
@@ -80,14 +118,17 @@ class PatientRegistrationController extends Controller
                 'first_name' => $patient->first_name,
                 'other_names' => $patient->other_names ?? '',
                 'date_of_birth' => $patient->date_of_birth?->toDateString() ?? '',
+                'dob_estimated' => $patient->dob_estimated,
                 'sex' => $patient->sex,
                 'marital_status' => $patient->marital_status ?? '',
+                'nin' => $patient->nin ?? '',
                 'phone' => $patient->phone ?? '',
                 'email' => $patient->email ?? '',
                 'address' => $patient->address ?? '',
                 'nationality' => $patient->nationality ?? '',
                 'state' => $patient->state ?? '',
                 'lga' => $patient->lga ?? '',
+                'ward' => $patient->ward ?? '',
                 'next_of_kin_name' => $patient->next_of_kin_name ?? '',
                 'next_of_kin_relationship' => $patient->next_of_kin_relationship ?? '',
                 'next_of_kin_phone' => $patient->next_of_kin_phone ?? '',
@@ -110,11 +151,19 @@ class PatientRegistrationController extends Controller
     /**
      * Save changes to a patient's demographics and coverage.
      */
-    public function update(UpdatePatientRequest $request, Patient $patient): RedirectResponse
+    public function update(UpdatePatientRequest $request, Patient $patient, DomainEvents $events): RedirectResponse
     {
-        $patient->fill($request->validated());
-        $this->applyCoverage($patient);
-        $patient->save();
+        DB::transaction(function () use ($request, $patient, $events) {
+            $patient->fill($request->validated());
+            $this->applyCoverage($patient);
+            $patient->save();
+
+            $changed = array_values(array_diff(array_keys($patient->getChanges()), ['updated_at']));
+
+            if ($changed !== []) {
+                $events->publish(new PatientUpdated($patient, $changed, $request->user()));
+            }
+        });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => "{$patient->fullName()}'s record updated."]);
 

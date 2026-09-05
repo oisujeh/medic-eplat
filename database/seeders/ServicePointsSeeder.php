@@ -17,6 +17,7 @@ class ServicePointsSeeder extends Seeder
     protected array $servicePoints = [
         ['slug' => 'triage', 'name' => 'Triage / Vitals', 'icon' => 'Activity', 'module_slug' => 'nursing', 'sort_order' => 10, 'captures_vitals' => true, 'description' => 'Vitals and anthropometrics captured by nursing staff.'],
         ['slug' => 'consultation', 'name' => 'General Consultation', 'icon' => 'Stethoscope', 'module_slug' => 'clinical', 'sort_order' => 20, 'description' => 'Clinician consultation and diagnosis.'],
+        ['slug' => 'emergency', 'name' => 'Emergency / Casualty', 'icon' => 'Siren', 'module_slug' => 'clinical', 'sort_order' => 25, 'captures_vitals' => true, 'description' => 'Emergency presentations seen by a clinician straight away.'],
         ['slug' => 'anc', 'name' => 'Antenatal Care (ANC)', 'icon' => 'Baby', 'module_slug' => 'nursing', 'sort_order' => 30, 'captures_vitals' => true],
         ['slug' => 'family-planning', 'name' => 'Family Planning', 'icon' => 'HeartHandshake', 'module_slug' => 'nursing', 'sort_order' => 40],
         ['slug' => 'immunization', 'name' => 'Immunization', 'icon' => 'Syringe', 'module_slug' => 'nursing', 'sort_order' => 50, 'captures_vitals' => true],

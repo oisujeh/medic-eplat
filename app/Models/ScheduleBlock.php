@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+use App\Models\Contracts\AuditableRecord;
 use Database\Factories\ScheduleBlockFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,10 +20,10 @@ use Illuminate\Support\Carbon;
  * @property int|null $created_by
  */
 #[Fillable(['provider_id', 'starts_at', 'ends_at', 'reason', 'created_by'])]
-class ScheduleBlock extends Model
+class ScheduleBlock extends Model implements AuditableRecord
 {
     /** @use HasFactory<ScheduleBlockFactory> */
-    use HasFactory;
+    use Auditable, HasFactory;
 
     /**
      * Get the attributes that should be cast.

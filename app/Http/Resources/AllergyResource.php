@@ -22,6 +22,7 @@ class AllergyResource extends JsonResource
             'reaction' => $this->reaction,
             'severity' => $this->severity,
             'category' => $this->category,
+            'concept_id' => $this->concept_id,
         ];
     }
 }

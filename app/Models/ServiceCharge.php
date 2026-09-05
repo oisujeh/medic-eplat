@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ServiceCategory;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasCatalogueVersions;
 use App\Models\Contracts\AuditableRecord;
 use Database\Factories\ServiceChargeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -26,7 +27,7 @@ use Illuminate\Database\Eloquent\Model;
 class ServiceCharge extends Model implements AuditableRecord
 {
     /** @use HasFactory<ServiceChargeFactory> */
-    use Auditable, HasFactory;
+    use Auditable, HasCatalogueVersions, HasFactory;
 
     /** The well-known code whose price is auto-charged when a consultation completes. */
     public const CONSULTATION = 'CONSULTATION';
@@ -66,5 +67,15 @@ class ServiceCharge extends Model implements AuditableRecord
     protected function active(Builder $query): void
     {
         $query->where('is_active', true)->orderBy('sort_order')->orderBy('name');
+    }
+
+    /**
+     * The attributes whose change opens a new catalogue version.
+     *
+     * @return list<string>
+     */
+    public function versionedAttributes(): array
+    {
+        return ['name', 'category', 'unit', 'price'];
     }
 }

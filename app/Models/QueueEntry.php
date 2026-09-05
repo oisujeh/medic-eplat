@@ -28,7 +28,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $completed_at
  */
 #[Fillable([
-    'visit_id', 'patient_id', 'service_point_id', 'status', 'priority', 'note',
+    'visit_id', 'patient_id', 'service_point_id', 'workflow_stage_id', 'status', 'priority', 'note',
     'routed_by', 'assigned_to', 'queued_at', 'started_at', 'completed_at',
 ])]
 class QueueEntry extends Model implements AuditableRecord
@@ -112,5 +112,15 @@ class QueueEntry extends Model implements AuditableRecord
     {
         $query->orderByRaw("CASE priority WHEN 'emergency' THEN 3 WHEN 'urgent' THEN 2 ELSE 1 END DESC")
             ->orderBy('queued_at');
+    }
+
+    /**
+     * The pathway step this entry is, when the visit follows a pathway.
+     *
+     * @return BelongsTo<WorkflowStage, $this>
+     */
+    public function stage(): BelongsTo
+    {
+        return $this->belongsTo(WorkflowStage::class, 'workflow_stage_id');
     }
 }

@@ -16,6 +16,7 @@ return new class extends Migration
     {
         Schema::create('bills', function (Blueprint $table) {
             $table->id();
+            $table->ulid('ulid')->unique();
             $table->foreignId('patient_id')->constrained()->cascadeOnDelete();
             $table->foreignId('visit_id')->nullable()->constrained()->nullOnDelete();
             $table->string('status')->default('open');        // App\Enums\BillStatus
@@ -34,6 +35,7 @@ return new class extends Migration
             $table->decimal('unit_price', 12, 2)->default(0);
             $table->decimal('total', 12, 2)->default(0);
             $table->nullableMorphs('reference');              // e.g. a dispense item, lab order
+            $table->foreignId('catalogue_version_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
@@ -42,6 +44,7 @@ return new class extends Migration
 
         Schema::create('dispenses', function (Blueprint $table) {
             $table->id();
+            $table->ulid('ulid')->unique();
             $table->foreignId('patient_id')->constrained()->cascadeOnDelete();
             $table->foreignId('visit_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('encounter_id')->nullable()->constrained()->nullOnDelete();

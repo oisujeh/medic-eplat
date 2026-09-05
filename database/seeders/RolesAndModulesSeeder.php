@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Permission;
 use App\Models\Module;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
@@ -160,6 +161,20 @@ class RolesAndModulesSeeder extends Seeder
                     ->filter()
                     ->all(),
             );
+        }
+
+        // Permissions start from the defaults each one declares. Roles that
+        // grant all modules hold everything and need no rows.
+        $grants = [];
+
+        foreach (Permission::cases() as $permission) {
+            foreach ($permission->defaultRoles() as $slug) {
+                $grants[$slug][] = $permission;
+            }
+        }
+
+        foreach (Role::query()->where('grants_all_modules', false)->get() as $role) {
+            $role->syncPermissions($grants[$role->slug] ?? []);
         }
     }
 }

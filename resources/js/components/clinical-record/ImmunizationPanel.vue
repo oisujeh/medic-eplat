@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { router, useForm } from '@inertiajs/vue3';
 import { Plus, Syringe, Trash2 } from '@lucide/vue';
+import ConceptPicker from '@/components/clinical-record/ConceptPicker.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ const props = defineProps<{
 
 const form = useForm({
     vaccine: '',
+    concept_id: null as number | null,
     dose_label: '',
     batch_no: '',
     site: '',
@@ -86,7 +88,12 @@ function remove(id: number) {
             class="grid gap-2 sm:grid-cols-2 md:grid-cols-3"
             @submit.prevent="add"
         >
-            <Input v-model="form.vaccine" placeholder="Vaccine (e.g. Penta)" />
+            <ConceptPicker
+                v-model="form.vaccine"
+                v-model:concept-id="form.concept_id"
+                concept-class="vaccine"
+                placeholder="Vaccine (e.g. Penta)"
+            />
             <Input v-model="form.dose_label" placeholder="Dose (e.g. OPV 1)" />
             <Input v-model="form.batch_no" placeholder="Batch no." />
             <Input v-model="form.site" placeholder="Site" />

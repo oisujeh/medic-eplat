@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\AuthorizesEncounterRecords;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreImmunizationRequest extends FormRequest
 {
@@ -18,6 +19,7 @@ class StoreImmunizationRequest extends FormRequest
     {
         return [
             'vaccine' => ['required', 'string', 'max:100'],
+            'concept_id' => ['nullable', 'integer', Rule::exists('concepts', 'id')->where('class', 'vaccine')],
             'dose_label' => ['nullable', 'string', 'max:100'],
             'batch_no' => ['nullable', 'string', 'max:100'],
             'site' => ['nullable', 'string', 'max:100'],

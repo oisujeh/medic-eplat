@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Enums\EncounterOutcome;
 use App\Enums\EncounterStatus;
-use App\Enums\EncounterType;
 use App\Enums\Priority;
 use App\Enums\QueueStatus;
+use App\Events\EncounterSigned;
 use App\Models\BillCharge;
 use App\Models\Encounter;
 use App\Models\QueueEntry;
@@ -14,6 +14,7 @@ use App\Models\ServiceCharge;
 use App\Models\ServicePoint;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The lifecycle of a clinical encounter: opened from a queue entry, drafted,
@@ -25,6 +26,8 @@ class EncounterService
         private readonly PatientFlowService $flow,
         private readonly BillingService $billing,
         private readonly AdmissionService $admissions,
+        private readonly DomainEvents $events,
+        private readonly WorkflowEngine $workflows,
     ) {}
 
     /**
@@ -47,10 +50,7 @@ class EncounterService
                     'visit_id' => $entry->visit_id,
                     'service_point_id' => $entry->service_point_id,
                     'author_id' => $actor->id,
-                    'type' => EncounterType::forServicePoint(
-                        (string) $entry->servicePoint?->module_slug,
-                        (string) $entry->servicePoint?->slug,
-                    ),
+                    'type' => $this->workflows->encounterTypeFor($entry),
                     'status' => EncounterStatus::InProgress,
                     'started_at' => now(),
                 ],
@@ -86,6 +86,14 @@ class EncounterService
         ?string $nextNote = null,
         ?User $nextAssignedTo = null,
     ): Encounter {
+        $encounter->loadMissing('visit', 'servicePoint');
+
+        if ($next !== null && ! $this->workflows->allows($encounter->visit, $encounter->servicePoint, $next)) {
+            throw ValidationException::withMessages([
+                'next_service_point_id' => "{$next->name} does not follow {$encounter->servicePoint?->name} on this patient's pathway.",
+            ]);
+        }
+
         return DB::transaction(function () use ($encounter, $actor, $narrative, $next, $nextPriority, $nextNote, $nextAssignedTo) {
             $encounter->fill($this->narrativeOnly($narrative));
             $encounter->fill([
@@ -95,13 +103,13 @@ class EncounterService
             ]);
             $encounter->save();
 
-            if ($encounter->type->isConsultation()) {
-                if ($encounter->outcome === EncounterOutcome::Admit) {
-                    $this->admissions->requestFromEncounter($encounter, $actor);
-                }
+            $this->events->publish(new EncounterSigned($encounter, $actor));
 
-                $this->postConsultationFee($encounter, $actor);
+            if ($encounter->type->isConsultation() && $encounter->outcome === EncounterOutcome::Admit) {
+                $this->admissions->requestFromEncounter($encounter, $actor);
             }
+
+            $this->postStageFee($encounter, $actor);
 
             $entry = $encounter->queueEntry;
 
@@ -121,26 +129,35 @@ class EncounterService
     }
 
     /**
-     * Post the consultation fee from the fee schedule to the visit's bill.
+     * Post the fee the pathway step carries (the consultation fee where no
+     * pathway says otherwise) from the fee schedule to the visit's bill.
      */
-    private function postConsultationFee(Encounter $encounter, User $actor): void
+    private function postStageFee(Encounter $encounter, User $actor): void
     {
-        $fee = ServiceCharge::where('code', ServiceCharge::CONSULTATION)->active()->value('price');
+        $code = $this->workflows->chargeCodeFor($encounter);
 
-        if (! $fee || ! $encounter->visit) {
+        if ($code === null || ! $encounter->visit) {
             return;
         }
 
+        $charge = ServiceCharge::where('code', $code)->active()->first();
+
+        if ($charge === null || (float) $charge->price <= 0) {
+            return;
+        }
+
+        $fee = $charge->price;
         $encounter->loadMissing('servicePoint');
 
         $this->billing->postCharge(
             bill: $this->billing->openBillFor($encounter->patient, $encounter->visit),
             source: BillCharge::SOURCE_CONSULTATION,
-            description: 'Consultation — '.($encounter->servicePoint?->name ?? $encounter->type->label()),
+            description: $charge->name.' — '.($encounter->servicePoint->name ?? $encounter->type->label()),
             quantity: 1,
             unitPrice: (float) $fee,
             actor: $actor,
             reference: $encounter,
+            charge: $charge,
         );
     }
 

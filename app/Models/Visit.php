@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\VisitStatus;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
 use Database\Factories\VisitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -25,11 +26,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $opened_at
  * @property Carbon|null $closed_at
  */
-#[Fillable(['visit_number', 'patient_id', 'status', 'reason', 'opened_by', 'closed_by', 'opened_at', 'closed_at'])]
+#[Fillable(['visit_number', 'patient_id', 'workflow_id', 'status', 'reason', 'opened_by', 'closed_by', 'opened_at', 'closed_at'])]
 class Visit extends Model implements AuditableRecord
 {
     /** @use HasFactory<VisitFactory> */
-    use Auditable, HasFactory;
+    use Auditable, HasFactory, HasPublicId;
 
     /**
      * Get the attributes that should be cast.
@@ -111,5 +112,15 @@ class Visit extends Model implements AuditableRecord
     public function isOpen(): bool
     {
         return $this->status === VisitStatus::Open;
+    }
+
+    /**
+     * The pathway the visit follows, when it follows one.
+     *
+     * @return BelongsTo<Workflow, $this>
+     */
+    public function workflow(): BelongsTo
+    {
+        return $this->belongsTo(Workflow::class);
     }
 }

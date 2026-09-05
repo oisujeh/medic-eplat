@@ -49,6 +49,7 @@ class HandleInertiaRequests extends Middleware
                 'roles' => $user
                     ? $user->roles->pluck('slug')->all()
                     : [],
+                'permissions' => $user ? $user->permissionSlugs() : [],
                 'modules' => $user
                     ? $user->accessibleModules()->map(fn ($module) => [
                         'name' => $module->name,

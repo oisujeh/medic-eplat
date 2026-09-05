@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Permission;
 use App\Models\Concerns\Auditable;
 use App\Models\Contracts\AuditableRecord;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -42,6 +43,13 @@ class User extends Authenticatable implements AuditableRecord, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use Auditable, HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    /**
+     * The permission slugs the user's roles grant, resolved once per instance.
+     *
+     * @var list<string>|null
+     */
+    private ?array $grantedPermissions = null;
 
     /**
      * Get the attributes that should be cast.
@@ -147,6 +155,40 @@ class User extends Authenticatable implements AuditableRecord, PasskeyUser
         return Module::active()
             ->whereHas('roles', fn ($query) => $query->whereIn('roles.id', $this->roles->pluck('id')))
             ->get();
+    }
+
+    /**
+     * Whether any of the user's roles grants the permission. A role that
+     * grants all modules holds every permission.
+     */
+    public function hasPermission(Permission $permission): bool
+    {
+        if ($this->hasFullModuleAccess()) {
+            return true;
+        }
+
+        $this->grantedPermissions ??= array_values(array_unique(
+            RolePermission::query()
+                ->whereIn('role_id', $this->roles->pluck('id'))
+                ->pluck('permission')
+                ->map(fn (Permission $p) => $p->value)
+                ->all(),
+        ));
+
+        return in_array($permission->value, $this->grantedPermissions, true);
+    }
+
+    /**
+     * The permissions the user holds, for the client to show or hide actions.
+     *
+     * @return list<string>
+     */
+    public function permissionSlugs(): array
+    {
+        return array_values(array_filter(
+            array_map(fn (Permission $p) => $p->value, Permission::cases()),
+            fn (string $slug) => $this->hasPermission(Permission::from($slug)),
+        ));
     }
 
     /**

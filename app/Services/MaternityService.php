@@ -2,7 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\MaternalOutcome;
+use App\Enums\NumberKind;
 use App\Enums\PregnancyStatus;
+use App\Events\DeliveryRecorded;
+use App\Events\PatientDied;
+use App\Events\PatientRegistered;
 use App\Models\Birth;
 use App\Models\Delivery;
 use App\Models\Patient;
@@ -10,7 +15,6 @@ use App\Models\Pregnancy;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -19,6 +23,11 @@ use Illuminate\Validation\ValidationException;
  */
 class MaternityService
 {
+    public function __construct(
+        private readonly NumberSequences $numbers,
+        private readonly DomainEvents $events,
+    ) {}
+
     /**
      * Open a pregnancy episode for a woman.
      *
@@ -38,15 +47,13 @@ class MaternityService
 
         return DB::transaction(function () use ($patient, $actor, $data) {
             $pregnancy = Pregnancy::create([
-                'pregnancy_number' => 'TMP-'.$patient->id.'-'.now()->timestamp,
+                'pregnancy_number' => $this->numbers->next(NumberKind::Pregnancy),
                 'patient_id' => $patient->id,
                 'status' => PregnancyStatus::Active,
                 ...$this->datedAttributes($data),
                 'booking_date' => $data['booking_date'] ?? now()->toDateString(),
                 'booked_by' => $actor->id,
             ]);
-
-            $pregnancy->update(['pregnancy_number' => sprintf('PRG/%d/%06d', now()->year, $pregnancy->id)]);
 
             return $pregnancy->refresh();
         });
@@ -128,7 +135,15 @@ class MaternityService
                 'closed_by' => $actor->id,
             ]);
 
-            return $record->refresh();
+            $record->refresh();
+
+            $this->events->publish(new DeliveryRecorded($record, $actor));
+
+            if ($record->maternal_outcome === MaternalOutcome::Deceased) {
+                $this->events->publish(new PatientDied($pregnancy->patient, $record, $record->delivered_at, $actor));
+            }
+
+            return $record;
         });
     }
 
@@ -173,6 +188,8 @@ class MaternityService
                 'first_name' => 'Baby of '.$mother->first_name,
                 'date_of_birth' => $delivery->delivered_at->toDateString(),
                 'sex' => $birth->sex,
+                'dob_estimated' => false,
+                'mother_patient_id' => $mother->id,
                 'phone' => $mother->phone,
                 'address' => $mother->address,
                 'nationality' => $mother->nationality ?? 'Nigerian',
@@ -187,11 +204,10 @@ class MaternityService
                 'outpatient_service' => 'Child Follow-up & Immunization',
             ]);
             $baby->registered_by = $actor->id;
-            $baby->file_number = 'TMP-'.Str::uuid();
+            $baby->file_number = $this->numbers->next(NumberKind::Patient);
             $baby->save();
 
-            $baby->file_number = sprintf('MEP/%d/%06d', $baby->created_at->year, $baby->id);
-            $baby->save();
+            $this->events->publish(new PatientRegistered($baby, $actor));
 
             $birth->update(['newborn_patient_id' => $baby->id]);
 

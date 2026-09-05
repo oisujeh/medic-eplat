@@ -22,6 +22,7 @@ return new class extends Migration
             $table->foreignId('recorded_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->string('substance');                     // e.g. Penicillin
+            $table->foreignId('concept_id')->nullable()->constrained()->nullOnDelete();
             $table->string('category')->nullable();          // drug | food | environmental
             $table->string('reaction')->nullable();          // e.g. rash, anaphylaxis
             $table->string('severity')->nullable();          // mild | moderate | severe
@@ -60,6 +61,7 @@ return new class extends Migration
             $table->foreignId('prescribed_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->string('name');                          // e.g. TLD, Amlodipine
+            $table->foreignId('concept_id')->nullable()->constrained()->nullOnDelete();
             $table->string('dose')->nullable();              // e.g. 5mg
             $table->string('frequency')->nullable();         // e.g. OD, BD
             $table->string('route')->nullable();             // e.g. PO

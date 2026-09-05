@@ -40,6 +40,11 @@ const { startedLabel, durationLabel } = useElapsed(props.encounter.started_at);
                             {{ patient.name }}
                         </h1>
                         <span
+                            v-if="patient.deceased"
+                            class="inline-flex items-center rounded-full bg-foreground px-2 py-0.5 text-xs font-medium text-background"
+                            >Deceased</span
+                        >
+                        <span
                             class="inline-flex items-center gap-2 text-sm text-muted-foreground"
                         >
                             <span>{{ patient.sex_label }}</span>

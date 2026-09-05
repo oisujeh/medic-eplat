@@ -12,6 +12,7 @@ use App\Http\Controllers\ClaimController;
 use App\Http\Controllers\ClinicalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\DuplicateController;
 use App\Http\Controllers\EncounterController;
 use App\Http\Controllers\IcdCodeController;
 use App\Http\Controllers\ImmunizationController;
@@ -40,6 +41,7 @@ use App\Http\Controllers\ReportRunnerController;
 use App\Http\Controllers\ServiceChargeController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\SurveillanceController;
+use App\Http\Controllers\TerminologyController;
 use App\Http\Controllers\VisitController;
 use App\Http\Controllers\WardController;
 use Illuminate\Support\Facades\Route;
@@ -61,9 +63,21 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Concept lookup for the pickers on clinical forms (drugs, allergens, vaccines).
+    Route::get('terminology/search', [TerminologyController::class, 'search'])->name('terminology.search');
+
     Route::middleware('module:registration')->group(function () {
         Route::get('registration', [PatientRegistrationController::class, 'create'])->name('patients.register');
+        // The Master Patient Index check the form runs while details are typed.
+        Route::get('registration/lookup', [PatientRegistrationController::class, 'lookup'])->name('patients.lookup');
         Route::post('registration', [PatientRegistrationController::class, 'store'])->name('patients.store');
+
+        // Duplicate review. Registered before patients/{patient} so the
+        // static path wins.
+        Route::get('patients/duplicates', [DuplicateController::class, 'index'])->name('patients.duplicates.index');
+        Route::get('patients/duplicates/{candidate}', [DuplicateController::class, 'show'])->name('patients.duplicates.show');
+        Route::post('patients/duplicates/{candidate}/dismiss', [DuplicateController::class, 'dismiss'])->name('patients.duplicates.dismiss');
+        Route::post('patients/duplicates/{candidate}/merge', [DuplicateController::class, 'merge'])->name('patients.duplicates.merge')->middleware('permission:patients.merge');
         Route::get('patients/{patient}/edit', [PatientRegistrationController::class, 'edit'])->name('patients.edit');
         Route::patch('patients/{patient}', [PatientRegistrationController::class, 'update'])->name('patients.update');
     });
@@ -91,11 +105,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('appointments/patient-search', [AppointmentController::class, 'patientSearch'])->name('appointments.patients');
 
         Route::get('appointments/schedules', [ProviderScheduleController::class, 'index'])->name('appointments.schedules');
-        Route::post('appointments/schedules', [ProviderScheduleController::class, 'storeSchedule'])->name('appointments.schedules.store');
-        Route::patch('appointments/schedules/{schedule}', [ProviderScheduleController::class, 'updateSchedule'])->name('appointments.schedules.update');
-        Route::delete('appointments/schedules/{schedule}', [ProviderScheduleController::class, 'deleteSchedule'])->name('appointments.schedules.destroy');
-        Route::post('appointments/blocks', [ProviderScheduleController::class, 'storeBlock'])->name('appointments.blocks.store');
-        Route::delete('appointments/blocks/{block}', [ProviderScheduleController::class, 'deleteBlock'])->name('appointments.blocks.destroy');
+        Route::post('appointments/schedules', [ProviderScheduleController::class, 'storeSchedule'])->name('appointments.schedules.store')->middleware('permission:appointments.manage_schedules');
+        Route::patch('appointments/schedules/{schedule}', [ProviderScheduleController::class, 'updateSchedule'])->name('appointments.schedules.update')->middleware('permission:appointments.manage_schedules');
+        Route::delete('appointments/schedules/{schedule}', [ProviderScheduleController::class, 'deleteSchedule'])->name('appointments.schedules.destroy')->middleware('permission:appointments.manage_schedules');
+        Route::post('appointments/blocks', [ProviderScheduleController::class, 'storeBlock'])->name('appointments.blocks.store')->middleware('permission:appointments.manage_schedules');
+        Route::delete('appointments/blocks/{block}', [ProviderScheduleController::class, 'deleteBlock'])->name('appointments.blocks.destroy')->middleware('permission:appointments.manage_schedules');
 
         Route::post('appointments', [AppointmentController::class, 'store'])->name('appointments.store');
         Route::post('appointments/walk-in', [AppointmentController::class, 'walkIn'])->name('appointments.walk-in');
@@ -187,11 +201,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Static paths must precede the {case} wildcard.
         Route::get('surveillance/diseases', [NotifiableDiseaseController::class, 'index'])->name('surveillance.diseases.index');
-        Route::patch('surveillance/diseases/{disease}', [NotifiableDiseaseController::class, 'update'])->name('surveillance.diseases.update');
+        Route::patch('surveillance/diseases/{disease}', [NotifiableDiseaseController::class, 'update'])->name('surveillance.diseases.update')->middleware('permission:surveillance.manage_catalogue');
 
         Route::get('surveillance/{case}', [SurveillanceController::class, 'show'])->name('surveillance.show');
         Route::patch('surveillance/{case}', [SurveillanceController::class, 'update'])->name('surveillance.update');
-        Route::post('surveillance/{case}/notify', [SurveillanceController::class, 'notify'])->name('surveillance.notify');
+        Route::post('surveillance/{case}/notify', [SurveillanceController::class, 'notify'])->name('surveillance.notify')->middleware('permission:surveillance.notify');
     });
 
     // Admissions module — wards, beds and the inpatient record.
@@ -202,16 +216,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Static paths must precede the {admission} wildcard.
         Route::get('admissions/patient-search', [AdmissionController::class, 'patientSearch'])->name('admissions.patients');
 
-        Route::post('admissions/wards', [WardController::class, 'store'])->name('admissions.wards.store');
+        Route::post('admissions/wards', [WardController::class, 'store'])->name('admissions.wards.store')->middleware('permission:admissions.manage_wards');
         Route::get('admissions/wards/{ward}', [WardController::class, 'show'])->name('admissions.wards.show');
-        Route::patch('admissions/wards/{ward}', [WardController::class, 'update'])->name('admissions.wards.update');
-        Route::post('admissions/wards/{ward}/beds', [WardController::class, 'storeBeds'])->name('admissions.wards.beds.store');
-        Route::patch('admissions/beds/{bed}', [WardController::class, 'updateBed'])->name('admissions.beds.update');
+        Route::patch('admissions/wards/{ward}', [WardController::class, 'update'])->name('admissions.wards.update')->middleware('permission:admissions.manage_wards');
+        Route::post('admissions/wards/{ward}/beds', [WardController::class, 'storeBeds'])->name('admissions.wards.beds.store')->middleware('permission:admissions.manage_wards');
+        Route::patch('admissions/beds/{bed}', [WardController::class, 'updateBed'])->name('admissions.beds.update')->middleware('permission:admissions.manage_wards');
 
         Route::get('admissions/{admission}', [AdmissionController::class, 'show'])->name('admissions.show');
         Route::post('admissions/{admission}/assign', [AdmissionController::class, 'assign'])->name('admissions.assign');
         Route::post('admissions/{admission}/transfer', [AdmissionController::class, 'transfer'])->name('admissions.transfer');
-        Route::post('admissions/{admission}/discharge', [AdmissionController::class, 'discharge'])->name('admissions.discharge');
+        Route::post('admissions/{admission}/discharge', [AdmissionController::class, 'discharge'])->name('admissions.discharge')->middleware('permission:admissions.discharge');
         Route::post('admissions/{admission}/cancel', [AdmissionController::class, 'cancel'])->name('admissions.cancel');
         Route::post('admissions/{admission}/notes', [AdmissionController::class, 'storeNote'])->name('admissions.notes.store');
     });
@@ -223,8 +237,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('laboratory/{order}/collect', [LaboratoryController::class, 'collect'])->name('laboratory.collect');
         Route::post('laboratory/{order}/receive', [LaboratoryController::class, 'receive'])->name('laboratory.receive');
         Route::post('laboratory/{order}/results', [LaboratoryController::class, 'saveResults'])->name('laboratory.results');
-        Route::post('laboratory/{order}/verify', [LaboratoryController::class, 'verify'])->name('laboratory.verify');
-        Route::post('laboratory/{order}/cancel', [LaboratoryController::class, 'cancel'])->name('laboratory.cancel');
+        Route::post('laboratory/{order}/verify', [LaboratoryController::class, 'verify'])->name('laboratory.verify')->middleware('permission:laboratory.verify_results');
+        Route::post('laboratory/{order}/cancel', [LaboratoryController::class, 'cancel'])->name('laboratory.cancel')->middleware('permission:laboratory.cancel_orders');
     });
 
     // Inventory / Store module.
@@ -233,14 +247,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('inventory', [InventoryController::class, 'store'])->name('inventory.store');
         Route::get('inventory/{item}', [InventoryController::class, 'show'])->name('inventory.show');
         Route::post('inventory/{item}/receive', [InventoryController::class, 'receive'])->name('inventory.receive');
-        Route::post('inventory/batches/{batch}/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust');
+        Route::post('inventory/batches/{batch}/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust')->middleware('permission:inventory.adjust_stock');
     });
 
     // Pharmacy module — dispensing from stock.
     Route::middleware('module:pharmacy')->group(function () {
         Route::get('pharmacy', [PharmacyController::class, 'index'])->name('pharmacy.index');
         Route::get('pharmacy/{entry}', [PharmacyController::class, 'show'])->name('pharmacy.dispense');
-        Route::post('pharmacy/{entry}/dispense', [PharmacyController::class, 'dispense'])->name('pharmacy.dispense.store');
+        Route::post('pharmacy/{entry}/dispense', [PharmacyController::class, 'dispense'])->name('pharmacy.dispense.store')->middleware('permission:pharmacy.dispense');
     });
 
     // Billing module — the patient's running bill.
@@ -249,13 +263,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Fee schedule (static path — must precede the {bill} wildcard).
         Route::get('billing/services', [ServiceChargeController::class, 'index'])->name('billing.services.index');
-        Route::post('billing/services', [ServiceChargeController::class, 'store'])->name('billing.services.store');
-        Route::patch('billing/services/{serviceCharge}', [ServiceChargeController::class, 'update'])->name('billing.services.update');
+        Route::post('billing/services', [ServiceChargeController::class, 'store'])->name('billing.services.store')->middleware('permission:billing.manage_fees');
+        Route::patch('billing/services/{serviceCharge}', [ServiceChargeController::class, 'update'])->name('billing.services.update')->middleware('permission:billing.manage_fees');
 
         Route::get('billing/{bill}', [BillingController::class, 'show'])->name('billing.show');
         Route::get('billing/{bill}/invoice', [BillingController::class, 'invoice'])->name('billing.invoice');
         Route::post('billing/{bill}/charge', [BillingController::class, 'addCharge'])->name('billing.charge');
-        Route::post('billing/{bill}/pay', [BillingController::class, 'pay'])->name('billing.pay');
+        Route::post('billing/{bill}/pay', [BillingController::class, 'pay'])->name('billing.pay')->middleware('permission:billing.record_payments');
     });
 
     // Claims module — NHIA / HMO claims, schedules and payers.
@@ -267,20 +281,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('claims/bill-search', [ClaimController::class, 'billSearch'])->name('claims.bills');
 
         Route::get('claims/payers', [PayerController::class, 'index'])->name('claims.payers.index');
-        Route::post('claims/payers', [PayerController::class, 'store'])->name('claims.payers.store');
-        Route::patch('claims/payers/{payer}', [PayerController::class, 'update'])->name('claims.payers.update');
+        Route::post('claims/payers', [PayerController::class, 'store'])->name('claims.payers.store')->middleware('permission:claims.manage_payers');
+        Route::patch('claims/payers/{payer}', [PayerController::class, 'update'])->name('claims.payers.update')->middleware('permission:claims.manage_payers');
 
         Route::get('claims/batches', [ClaimBatchController::class, 'index'])->name('claims.batches.index');
         Route::get('claims/batches/{batch}', [ClaimBatchController::class, 'show'])->name('claims.batches.show');
-        Route::post('claims/batches/{batch}/submit', [ClaimBatchController::class, 'submit'])->name('claims.batches.submit');
+        Route::post('claims/batches/{batch}/submit', [ClaimBatchController::class, 'submit'])->name('claims.batches.submit')->middleware('permission:claims.manage');
 
         Route::get('claims/{claim}', [ClaimController::class, 'show'])->name('claims.show');
-        Route::delete('claims/{claim}', [ClaimController::class, 'destroy'])->name('claims.destroy');
+        Route::delete('claims/{claim}', [ClaimController::class, 'destroy'])->name('claims.destroy')->middleware('permission:claims.manage');
         Route::patch('claims/{claim}/lines/{line}', [ClaimController::class, 'updateLine'])->name('claims.lines.update');
-        Route::post('claims/{claim}/authorization', [ClaimController::class, 'authorize'])->name('claims.authorize');
-        Route::post('claims/{claim}/submit', [ClaimController::class, 'submit'])->name('claims.submit');
-        Route::post('claims/{claim}/remit', [ClaimController::class, 'remit'])->name('claims.remit');
-        Route::post('claims/{claim}/reject', [ClaimController::class, 'reject'])->name('claims.reject');
+        Route::post('claims/{claim}/authorization', [ClaimController::class, 'authorize'])->name('claims.authorize')->middleware('permission:claims.manage');
+        Route::post('claims/{claim}/submit', [ClaimController::class, 'submit'])->name('claims.submit')->middleware('permission:claims.manage');
+        Route::post('claims/{claim}/remit', [ClaimController::class, 'remit'])->name('claims.remit')->middleware('permission:claims.manage');
+        Route::post('claims/{claim}/reject', [ClaimController::class, 'reject'])->name('claims.reject')->middleware('permission:claims.manage');
     });
 
     // Reports module — a catalogue of runnable reports plus the executive dashboard.

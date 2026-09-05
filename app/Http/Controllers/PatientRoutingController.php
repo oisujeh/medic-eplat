@@ -7,6 +7,7 @@ use App\Http\Requests\RoutePatientRequest;
 use App\Models\Patient;
 use App\Models\ServicePoint;
 use App\Models\User;
+use App\Models\Workflow;
 use App\Services\PatientFlowService;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -31,6 +32,7 @@ class PatientRoutingController extends Controller
             note: $request->input('note'),
             visitReason: $request->input('visit_reason'),
             assignedTo: $assignee,
+            workflow: $request->filled('workflow_id') ? Workflow::find($request->integer('workflow_id')) : null,
         );
 
         $suffix = $assignee ? " ({$assignee->name})" : '';

@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Enums\Permission;
 use App\Models\AuditLog;
+use App\Models\User;
 use App\Services\AuditTrail;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Failed;
@@ -13,6 +15,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -34,6 +37,18 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->auditAuthentication();
+        $this->definePermissions();
+    }
+
+    /**
+     * Every permission is a gate ability, so `$user->can('pharmacy.dispense')`
+     * and `@can` work alongside the route middleware.
+     */
+    protected function definePermissions(): void
+    {
+        foreach (Permission::cases() as $permission) {
+            Gate::define($permission->value, fn (User $user): bool => $user->hasPermission($permission));
+        }
     }
 
     /**

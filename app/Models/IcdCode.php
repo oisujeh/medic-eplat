@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+use App\Models\Contracts\AuditableRecord;
 use Database\Factories\IcdCodeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -20,10 +22,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_active
  */
 #[Fillable(['code', 'description', 'chapter', 'is_active'])]
-class IcdCode extends Model
+class IcdCode extends Model implements AuditableRecord
 {
     /** @use HasFactory<IcdCodeFactory> */
-    use HasFactory;
+    use Auditable, HasFactory;
 
     /**
      * Get the attributes that should be cast.

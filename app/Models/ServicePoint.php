@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+use App\Models\Contracts\AuditableRecord;
 use Database\Factories\ServicePointFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -23,10 +25,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_active
  */
 #[Fillable(['name', 'slug', 'description', 'icon', 'module_slug', 'captures_vitals', 'sort_order', 'is_active'])]
-class ServicePoint extends Model
+class ServicePoint extends Model implements AuditableRecord
 {
     /** @use HasFactory<ServicePointFactory> */
-    use HasFactory;
+    use Auditable, HasFactory;
 
     /**
      * Get the attributes that should be cast.

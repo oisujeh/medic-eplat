@@ -30,6 +30,7 @@ class PatientBannerResource extends JsonResource
             'dob' => $this->date_of_birth?->isoFormat('D MMM YYYY'),
             'phone' => $this->phone,
             'address' => $this->address,
+            'deceased' => $this->isDeceased(),
             'url' => route('patients.show', $this->id),
         ];
     }

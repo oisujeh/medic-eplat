@@ -17,6 +17,7 @@ return new class extends Migration
     {
         Schema::create('claims', function (Blueprint $table) {
             $table->id();
+            $table->ulid('ulid')->unique();
             $table->string('claim_number')->unique();
             $table->foreignId('patient_id')->constrained()->cascadeOnDelete();
             $table->foreignId('payer_id')->constrained()->restrictOnDelete();

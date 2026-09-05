@@ -139,7 +139,7 @@ class ReportService
 
         return [
             'revenue' => $metric(fn ($a, $b) => (float) Payment::whereBetween('created_at', [$a, $b])->sum('amount')),
-            'patients' => $metric(fn ($a, $b) => Patient::whereBetween('created_at', [$a, $b])->count()),
+            'patients' => $metric(fn ($a, $b) => Patient::query()->current()->whereBetween('created_at', [$a, $b])->count()),
             'visits' => $metric(fn ($a, $b) => Visit::whereBetween('opened_at', [$a, $b])->count()),
             'consultations' => $metric(fn ($a, $b) => Encounter::consultations()->signed()
                 ->whereBetween('signed_at', [$a, $b])->count()),

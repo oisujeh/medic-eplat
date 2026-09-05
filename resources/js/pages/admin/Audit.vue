@@ -40,6 +40,7 @@ type Entry = {
         url: string;
     } | null;
     changes: Change[];
+    reason: string | null;
     hash: string;
 };
 
@@ -194,6 +195,7 @@ function actionVariant(
 function hasDetails(entry: Entry): boolean {
     return (
         entry.changes.length > 0 ||
+        entry.reason !== null ||
         entry.ip_address !== null ||
         entry.route !== null
     );
@@ -468,6 +470,15 @@ function pageLabel(label: string): string {
                                         </tr>
                                     </tbody>
                                 </table>
+                                <p
+                                    v-if="e.reason"
+                                    class="mt-2 text-xs"
+                                >
+                                    <span class="font-medium text-muted-foreground"
+                                        >Reason</span
+                                    >
+                                    {{ e.reason }}
+                                </p>
                                 <dl
                                     class="mt-2 grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4"
                                 >

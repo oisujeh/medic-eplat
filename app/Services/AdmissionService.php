@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Enums\AdmissionStatus;
 use App\Enums\BedStatus;
 use App\Enums\DischargeType;
+use App\Enums\NumberKind;
+use App\Events\PatientDied;
 use App\Models\Admission;
 use App\Models\AdmissionNote;
 use App\Models\Bed;
@@ -28,6 +30,9 @@ class AdmissionService
     public function __construct(
         private readonly PatientFlowService $flow,
         private readonly BillingService $billing,
+        private readonly NumberSequences $numbers,
+        private readonly DomainEvents $events,
+        private readonly AuditTrail $audit,
     ) {}
 
     /**
@@ -54,7 +59,7 @@ class AdmissionService
             $visit = $encounter?->visit ?? $this->flow->ensureOpenVisit($patient, $actor, 'Admission');
 
             $admission = Admission::create([
-                'admission_number' => 'TMP-'.$patient->id.'-'.now()->timestamp,
+                'admission_number' => $this->numbers->next(NumberKind::Admission),
                 'patient_id' => $patient->id,
                 'visit_id' => $visit->id,
                 'encounter_id' => $encounter?->id,
@@ -64,10 +69,6 @@ class AdmissionService
                 'reason' => $reason,
                 'requested_by' => $actor->id,
                 'attending_id' => $attending?->id,
-            ]);
-
-            $admission->update([
-                'admission_number' => sprintf('ADM/%d/%06d', now()->year, $admission->id),
             ]);
 
             return $admission;
@@ -137,6 +138,7 @@ class AdmissionService
                     unitPrice: (float) $fee->price,
                     actor: $actor,
                     reference: $admission,
+                    charge: $fee,
                 );
             }
 
@@ -206,6 +208,10 @@ class AdmissionService
 
             $this->postBedCharges($admission->refresh(), $actor);
 
+            if ($type === DischargeType::Deceased) {
+                $this->events->publish(new PatientDied($admission->patient, $admission, $admission->discharged_at, $actor));
+            }
+
             return $admission;
         });
     }
@@ -217,11 +223,11 @@ class AdmissionService
     {
         $this->assertStatus($admission, AdmissionStatus::Pending, 'Only an admission awaiting a bed can be cancelled.');
 
-        $admission->update([
+        $this->audit->withReason($reason, fn () => $admission->update([
             'status' => AdmissionStatus::Cancelled,
             'cancelled_at' => now(),
             'cancel_reason' => $reason,
-        ]);
+        ]));
 
         return $admission;
     }
@@ -264,6 +270,7 @@ class AdmissionService
             unitPrice: (float) $charge->price,
             actor: $actor,
             reference: $admission,
+            charge: $charge,
         );
     }
 

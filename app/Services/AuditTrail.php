@@ -24,6 +24,12 @@ class AuditTrail
     private bool $paused = false;
 
     /**
+     * The reason attached to every entry written while a withReason()
+     * callback runs.
+     */
+    private ?string $reason = null;
+
+    /**
      * Record an action in the trail.
      *
      * @param  array<string, mixed>|null  $old
@@ -36,6 +42,7 @@ class AuditTrail
         ?array $old = null,
         ?array $new = null,
         ?string $label = null,
+        ?string $reason = null,
     ): ?AuditLog {
         if ($this->paused) {
             return null;
@@ -43,6 +50,7 @@ class AuditTrail
 
         $user = auth()->user();
         $request = $this->currentRequest();
+        $reason = trim((string) ($reason ?? $this->reason));
 
         $fields = [
             'user_id' => $user?->getAuthIdentifier(),
@@ -54,6 +62,7 @@ class AuditTrail
             'patient_id' => $patientId,
             'old_values' => $old ?: null,
             'new_values' => $new ?: null,
+            'reason' => $reason === '' ? null : mb_substr($reason, 0, 500),
             'ip_address' => $request?->ip(),
             'user_agent' => $request ? mb_substr((string) $request->userAgent(), 0, 512) : null,
             'route' => $request?->route()?->getName(),
@@ -110,6 +119,37 @@ class AuditTrail
     public function recordAccess(Model&AuditableRecord $model): void
     {
         $this->record(AuditLog::ACTION_VIEWED, $model, $model->auditPatientId());
+    }
+
+    /**
+     * The reason attached to entries being written right now, if any.
+     */
+    public function currentReason(): ?string
+    {
+        $reason = trim((string) $this->reason);
+
+        return $reason === '' ? null : $reason;
+    }
+
+    /**
+     * Run a callback with a reason attached to every entry it writes, so a
+     * cancellation or adjustment records why as well as what.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public function withReason(?string $reason, callable $callback): mixed
+    {
+        $previous = $this->reason;
+        $this->reason = $reason;
+
+        try {
+            return $callback();
+        } finally {
+            $this->reason = $previous;
+        }
     }
 
     /**
@@ -199,6 +239,7 @@ class AuditTrail
             'patient_id' => $log->patient_id,
             'old_values' => $log->old_values,
             'new_values' => $log->new_values,
+            'reason' => $log->reason,
             'ip_address' => $log->ip_address,
             'user_agent' => $log->user_agent,
             'route' => $log->route,

@@ -8,7 +8,11 @@ use App\Http\Resources\ObservationSetResource;
 use App\Models\Patient;
 use App\Models\QueueEntry;
 use App\Models\ServicePoint;
+use App\Models\Workflow;
+use App\Services\DuplicateReview;
+use App\Services\PatientTimeline;
 use App\Support\PatientOptions;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,18 +22,20 @@ class PatientController extends Controller
     /**
      * Display a searchable, paginated list of patients.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, DuplicateReview $duplicates): Response
     {
         $search = trim((string) $request->string('search'));
 
         $patients = Patient::query()
+            ->current()
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('surname', 'like', "%{$search}%")
                         ->orWhere('first_name', 'like', "%{$search}%")
                         ->orWhere('other_names', 'like', "%{$search}%")
                         ->orWhere('file_number', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
+                        // Any identifier the patient carries: NIN, phone, HMO number.
+                        ->orWhereHas('identifiers', fn ($i) => $i->where('value', 'like', "%{$search}%"));
                 });
             })
             ->latest()
@@ -51,25 +57,44 @@ class PatientController extends Controller
                 'url' => route('patients.show', $patient),
             ]);
 
+        $canRegister = (bool) $request->user()?->canAccessModule('registration');
+
         return Inertia::render('patients/Index', [
             'patients' => $patients,
             'filters' => ['search' => $search],
-            'canRegister' => (bool) $request->user()?->canAccessModule('registration'),
+            'canRegister' => $canRegister,
+            'duplicatesPending' => $canRegister ? $duplicates->pendingCount() : 0,
         ]);
     }
 
     /**
-     * Display a single patient's profile.
+     * Display a single patient's profile. A merged record leads to the one
+     * that survived.
      */
-    public function show(Request $request, Patient $patient): Response
+    public function show(Request $request, Patient $patient, PatientTimeline $timeline): Response|RedirectResponse
     {
-        $patient->load('registeredBy:id,name');
+        if ($patient->isMerged()) {
+            Inertia::flash('toast', ['type' => 'info', 'message' => "{$patient->file_number} was merged into {$patient->mergedInto?->file_number}."]);
+
+            return to_route('patients.show', $patient->merged_into_id);
+        }
+
+        $patient->load('registeredBy:id,name', 'death', 'mother:id,file_number,surname,first_name,other_names');
         $user = $request->user();
 
         return Inertia::render('patients/Show', [
             'patient' => [
                 'id' => $patient->id,
                 'file_number' => $patient->file_number,
+                'nin' => $patient->nin,
+                'dob_estimated' => $patient->dob_estimated,
+                'ward' => $patient->ward,
+                'deceased_at' => $patient->death?->died_at->isoFormat('D MMM YYYY'),
+                'mother' => $patient->mother ? [
+                    'name' => $patient->mother->fullName(),
+                    'file_number' => $patient->mother->file_number,
+                    'url' => route('patients.show', $patient->mother),
+                ] : null,
                 'title' => $patient->title,
                 'full_name' => $patient->fullName(),
                 'initials' => $patient->initials(),
@@ -115,6 +140,7 @@ class PatientController extends Controller
             'canBookPregnancy' => $patient->sex === 'F' && (bool) $user?->canAccessModule('maternity'),
             'canAdmit' => (bool) $user?->canAccessModule('admissions'),
             'canEdit' => (bool) $user?->canAccessModule('registration'),
+            'timeline' => $timeline->present($patient),
             'observationSets' => ObservationSetResource::collection(
                 $patient->observationSets()->with('observations', 'recordedBy:id,name')->take(12)->get(),
             ),
@@ -135,6 +161,15 @@ class PatientController extends Controller
                     'label' => $p->label(),
                 ]),
                 'visitReasons' => PatientOptions::VISIT_REASONS,
+                // Pathways, with the service points each may start at.
+                'workflows' => Workflow::query()->active()->with('stages')->orderByDesc('is_default')->orderBy('sort_order')->get()
+                    ->map(fn (Workflow $w) => [
+                        'id' => $w->id,
+                        'name' => $w->name,
+                        'is_default' => $w->is_default,
+                        'entry_points' => $w->stages->where('is_entry', true)->pluck('service_point_id')->values()->all(),
+                    ])
+                    ->values(),
             ],
             'canRoute' => (bool) $user?->canAccessModule('queues'),
             'canBook' => (bool) $user?->canAccessModule('appointments'),

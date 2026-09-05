@@ -37,6 +37,8 @@ import type {
     Problem,
     Referral,
     ReferralDraft,
+    TimelineEntry,
+    TimelineKindOption,
     ServicePointOption,
 } from '@/types/clinical';
 
@@ -57,6 +59,7 @@ const props = defineProps<{
     observationCodes: ObservationCodeDefinition[];
     labCatalog: LabTest[];
     pastEncounters: EncounterSummary[];
+    timeline: { entries: TimelineEntry[]; kinds: TimelineKindOption[] };
     onwardServicePoints: ServicePointOption[];
     priorities: Option[];
     outcomes: Option[];
@@ -265,6 +268,7 @@ const backLabel = isConsultation ? 'Back to clinical' : 'Back to nursing';
                 :problems="problems"
                 :medications="medications"
                 :lab-results="labResults"
+                :timeline="timeline.entries"
                 :patient-url="patient.url"
                 :stages="
                     isConsultation

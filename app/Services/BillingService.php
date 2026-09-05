@@ -8,6 +8,7 @@ use App\Models\Bill;
 use App\Models\BillCharge;
 use App\Models\Patient;
 use App\Models\Payment;
+use App\Models\ServiceCharge;
 use App\Models\User;
 use App\Models\Visit;
 use Illuminate\Database\Eloquent\Model;
@@ -51,6 +52,7 @@ class BillingService
         float $unitPrice,
         User $actor,
         ?Model $reference = null,
+        ?ServiceCharge $charge = null,
     ): BillCharge {
         return $bill->charges()->create([
             'source' => $source,
@@ -60,6 +62,8 @@ class BillingService
             'total' => round($quantity * $unitPrice, 2),
             'reference_type' => $reference ? $reference::class : null,
             'reference_id' => $reference?->getKey(),
+            // The fee-schedule version the price came from, when it did.
+            'catalogue_version_id' => $charge?->currentVersion()->id,
             'created_by' => $actor->id,
         ]);
     }

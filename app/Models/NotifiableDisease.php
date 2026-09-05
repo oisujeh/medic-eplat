@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\NotifiableDiseaseCategory;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasCatalogueVersions;
 use App\Models\Contracts\AuditableRecord;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -34,7 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class NotifiableDisease extends Model implements AuditableRecord
 {
-    use Auditable;
+    use Auditable, HasCatalogueVersions;
 
     /** Opened automatically when a diagnosis carries one of the ICD-10 prefixes. */
     public const DETECTION_DIAGNOSIS = 'diagnosis';
@@ -105,5 +106,15 @@ class NotifiableDisease extends Model implements AuditableRecord
         }
 
         return false;
+    }
+
+    /**
+     * The attributes whose change opens a new catalogue version.
+     *
+     * @return list<string>
+     */
+    public function versionedAttributes(): array
+    {
+        return ['name', 'category', 'detection', 'icd_prefixes', 'case_definition', 'notification_hours', 'requires_contact_tracing'];
     }
 }

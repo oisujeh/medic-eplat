@@ -6,13 +6,18 @@ use App\Enums\AdmissionStatus;
 use App\Enums\PregnancyStatus;
 use App\Enums\VisitStatus;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
+use App\Services\PatientIdentifiers;
 use Database\Factories\PatientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -52,8 +57,9 @@ use Illuminate\Support\Str;
  * @property Carbon|null $updated_at
  */
 #[Fillable([
-    'title', 'surname', 'first_name', 'other_names', 'date_of_birth', 'sex',
-    'marital_status', 'phone', 'email', 'address', 'nationality', 'state', 'lga',
+    'title', 'surname', 'first_name', 'other_names', 'date_of_birth', 'dob_estimated', 'sex',
+    'marital_status', 'nin', 'phone', 'email', 'address', 'nationality', 'state', 'lga', 'ward',
+    'mother_patient_id',
     'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
     'coverage', 'hmo_name', 'payer_id', 'hmo_number', 'hmo_plan', 'hmo_expires_at',
     'is_transfer', 'transfer_from', 'transfer_reason', 'transfer_service',
@@ -62,7 +68,7 @@ use Illuminate\Support\Str;
 class Patient extends Model implements AuditableRecord
 {
     /** @use HasFactory<PatientFactory> */
-    use Auditable, HasFactory;
+    use Auditable, HasFactory, HasPublicId;
 
     /**
      * Get the attributes that should be cast.
@@ -73,9 +79,46 @@ class Patient extends Model implements AuditableRecord
     {
         return [
             'date_of_birth' => 'date',
+            'dob_estimated' => 'boolean',
             'hmo_expires_at' => 'date',
             'is_transfer' => 'boolean',
+            'merged_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Records that still stand: not merged into another as a duplicate.
+     *
+     * @param  Builder<Patient>  $query
+     */
+    #[Scope]
+    protected function current(Builder $query): void
+    {
+        $query->whereNull('merged_into_id');
+    }
+
+    /**
+     * The record this one was merged into, when it was a duplicate.
+     *
+     * @return BelongsTo<Patient, $this>
+     */
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(Patient::class, 'merged_into_id');
+    }
+
+    public function isMerged(): bool
+    {
+        return $this->merged_into_id !== null;
+    }
+
+    /**
+     * The identifier index follows the record: every save mirrors the file
+     * number, NIN, phone and HMO number into patient_identifiers.
+     */
+    protected static function booted(): void
+    {
+        static::saved(fn (Patient $patient) => app(PatientIdentifiers::class)->sync($patient));
     }
 
     /**
@@ -86,6 +129,47 @@ class Patient extends Model implements AuditableRecord
     public function registeredBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'registered_by');
+    }
+
+    /**
+     * Every identifier the patient carries, the index the MPI searches.
+     *
+     * @return HasMany<PatientIdentifier, $this>
+     */
+    public function identifiers(): HasMany
+    {
+        return $this->hasMany(PatientIdentifier::class);
+    }
+
+    /**
+     * @return HasOne<Death, $this>
+     */
+    public function death(): HasOne
+    {
+        return $this->hasOne(Death::class);
+    }
+
+    public function isDeceased(): bool
+    {
+        return $this->relationLoaded('death') ? $this->death !== null : $this->death()->exists();
+    }
+
+    /**
+     * The patient's mother, when she is also on the register.
+     *
+     * @return BelongsTo<Patient, $this>
+     */
+    public function mother(): BelongsTo
+    {
+        return $this->belongsTo(Patient::class, 'mother_patient_id');
+    }
+
+    /**
+     * @return HasMany<Patient, $this>
+     */
+    public function children(): HasMany
+    {
+        return $this->hasMany(Patient::class, 'mother_patient_id');
     }
 
     /**

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ConceptClass;
 use App\Http\Controllers\Concerns\AssertsEncounterRecord;
 use App\Http\Requests\StoreAllergyRequest;
 use App\Models\Allergy;
 use App\Models\Encounter;
+use App\Services\Terminology;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,10 +22,13 @@ class AllergyController extends Controller
     /**
      * Record an allergy.
      */
-    public function store(StoreAllergyRequest $request, Encounter $encounter): RedirectResponse
+    public function store(StoreAllergyRequest $request, Encounter $encounter, Terminology $terminology): RedirectResponse
     {
+        $data = $request->validated();
+
         $encounter->patient->allergies()->create([
-            ...$request->validated(),
+            ...$data,
+            'concept_id' => $terminology->code(ConceptClass::Allergen, $data['concept_id'] ?? null, $data['substance']),
             'status' => Allergy::STATUS_ACTIVE,
             'recorded_by' => $request->user()->id,
             'noted_at' => now(),

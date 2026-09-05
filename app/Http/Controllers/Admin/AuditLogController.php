@@ -137,6 +137,7 @@ class AuditLogController extends Controller
                 'url' => route('patients.show', $patient),
             ] : null,
             'changes' => $this->changes($entry),
+            'reason' => $entry->reason,
             'hash' => substr($entry->hash, 0, 12),
         ];
     }

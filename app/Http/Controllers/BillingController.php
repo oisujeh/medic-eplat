@@ -141,6 +141,8 @@ class BillingController extends Controller
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
+        $service = null;
+
         if (! empty($data['service_charge_id'])) {
             $service = ServiceCharge::findOrFail((int) $data['service_charge_id']);
             $description = $service->label();
@@ -152,7 +154,7 @@ class BillingController extends Controller
             $source = 'other';
         }
 
-        $this->billing->postCharge($bill, $source, $description, (int) $data['quantity'], $unitPrice, $request->user());
+        $this->billing->postCharge($bill, $source, $description, (int) $data['quantity'], $unitPrice, $request->user(), charge: $service);
         $this->billing->refreshStatus($bill);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Charge added.']);

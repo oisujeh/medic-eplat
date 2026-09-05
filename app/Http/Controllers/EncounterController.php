@@ -30,7 +30,9 @@ use App\Models\ServicePoint;
 use App\Services\AppointmentService;
 use App\Services\CaseSurveillance;
 use App\Services\EncounterService;
+use App\Services\PatientTimeline;
 use App\Services\ReferralService;
+use App\Services\WorkflowEngine;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,6 +50,8 @@ class EncounterController extends Controller
         private readonly AppointmentService $appointments,
         private readonly CaseSurveillance $surveillance,
         private readonly ReferralService $referrals,
+        private readonly PatientTimeline $timeline,
+        private readonly WorkflowEngine $workflows,
     ) {}
 
     /**
@@ -60,7 +64,7 @@ class EncounterController extends Controller
 
         $encounter->load([
             'servicePoint:id,name,slug,captures_vitals',
-            'visit:id,visit_number,opened_at',
+            'visit:id,visit_number,opened_at,workflow_id',
             'author:id,name',
             'immunizations.administeredBy:id,name',
             'addenda.author:id,name',
@@ -88,6 +92,8 @@ class EncounterController extends Controller
             'labResults' => LabResultResource::collection($patient->labResults),
             'alerts' => PatientAlertResource::collection($patient->alerts),
             'surveillanceCases' => $this->surveillance->bannerFor($patient),
+            // The most recent history, for the sidebar digest; the chart has the rest.
+            'timeline' => $this->timeline->present($patient, null, 25),
             'referrals' => ReferralResource::collection(
                 $patient->referrals()->latest('referred_at')->take(5)->get(),
             ),
@@ -100,7 +106,11 @@ class EncounterController extends Controller
                 ? LabTestResource::collection(LabTest::active()->withCount('components')->get())
                 : [],
             'pastEncounters' => EncounterSummaryResource::collection($this->pastEncounters($encounter)),
-            'onwardServicePoints' => ServicePointOptionResource::collection(ServicePoint::active()->get()),
+            // The steps the patient's pathway allows next, suggested first;
+            // every active service point where the pathway does not say.
+            'onwardServicePoints' => ServicePointOptionResource::collection(
+                $this->workflows->nextOptions($encounter->visit, $encounter->servicePoint) ?? ServicePoint::active()->get(),
+            ),
             'priorities' => collect(Priority::cases())->map(fn (Priority $p) => [
                 'value' => $p->value,
                 'label' => $p->label(),

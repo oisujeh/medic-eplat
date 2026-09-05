@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Enums\LabDepartment;
+use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasCatalogueVersions;
+use App\Models\Contracts\AuditableRecord;
 use Database\Factories\LabTestFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -10,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
@@ -29,14 +33,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int $sort_order
  */
 #[Fillable([
-    'code', 'name', 'department', 'specimen_type', 'unit', 'reference_low',
+    'concept_id', 'code', 'name', 'department', 'specimen_type', 'unit', 'reference_low',
     'reference_high', 'reference_text', 'price', 'turnaround_hours',
     'is_panel', 'is_active', 'sort_order',
 ])]
-class LabTest extends Model
+class LabTest extends Model implements AuditableRecord
 {
     /** @use HasFactory<LabTestFactory> */
-    use HasFactory;
+    use Auditable, HasCatalogueVersions, HasFactory;
 
     /**
      * Get the attributes that should be cast.
@@ -112,5 +116,25 @@ class LabTest extends Model
     protected function active(Builder $query): void
     {
         $query->where('is_active', true)->orderBy('sort_order')->orderBy('name');
+    }
+
+    /**
+     * The terminology concept this entry is coded to, when it is.
+     *
+     * @return BelongsTo<Concept, $this>
+     */
+    public function concept(): BelongsTo
+    {
+        return $this->belongsTo(Concept::class);
+    }
+
+    /**
+     * The attributes whose change opens a new catalogue version.
+     *
+     * @return list<string>
+     */
+    public function versionedAttributes(): array
+    {
+        return ['name', 'department', 'specimen_type', 'unit', 'reference_low', 'reference_high', 'reference_text', 'price', 'turnaround_hours', 'is_panel'];
     }
 }

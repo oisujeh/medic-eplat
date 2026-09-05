@@ -24,6 +24,7 @@ class ImmunizationResource extends JsonResource
             'batch_no' => $this->batch_no,
             'site' => $this->site,
             'route' => $this->route,
+            'concept_id' => $this->concept_id,
             'administered_at' => $this->administered_at?->isoFormat('D MMM YYYY, h:mm a'),
         ];
     }

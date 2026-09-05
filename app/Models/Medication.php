@@ -29,7 +29,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  */
 #[Fillable([
-    'patient_id', 'visit_id', 'encounter_id', 'prescribed_by', 'name',
+    'concept_id', 'patient_id', 'visit_id', 'encounter_id', 'prescribed_by', 'name',
     'dose', 'frequency', 'route', 'status', 'started_at', 'stopped_at', 'notes',
 ])]
 class Medication extends Model implements AuditableRecord
@@ -90,5 +90,15 @@ class Medication extends Model implements AuditableRecord
     public function prescribedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'prescribed_by');
+    }
+
+    /**
+     * The terminology concept this entry is coded to, when it is.
+     *
+     * @return BelongsTo<Concept, $this>
+     */
+    public function concept(): BelongsTo
+    {
+        return $this->belongsTo(Concept::class);
     }
 }

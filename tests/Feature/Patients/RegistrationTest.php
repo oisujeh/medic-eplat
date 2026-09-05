@@ -83,7 +83,8 @@ test('a records officer can register a patient', function () {
     expect($patient->state)->toBe('Lagos');
     expect($patient->lga)->toBe('Ikeja');
     expect($patient->registered_by)->toBe($officer->id);
-    expect($patient->file_number)->toBe('MEP/'.now()->year.'/'.str_pad((string) $patient->id, 6, '0', STR_PAD_LEFT));
+    expect($patient->file_number)->toBe(sprintf('MEP/%d/000001', now()->year))
+        ->and($patient->ulid)->toHaveLength(26);
 });
 
 test('an LGA must belong to the selected state', function () {

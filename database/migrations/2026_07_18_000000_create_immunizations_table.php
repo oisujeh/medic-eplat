@@ -22,6 +22,7 @@ return new class extends Migration
             $table->foreignId('administered_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->string('vaccine');                       // e.g. BCG, OPV, Penta
+            $table->foreignId('concept_id')->nullable()->constrained()->nullOnDelete();
             $table->string('dose_label')->nullable();        // e.g. Birth, OPV 1, Booster
             $table->string('batch_no')->nullable();
             $table->string('site')->nullable();              // e.g. Left thigh

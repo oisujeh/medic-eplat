@@ -27,7 +27,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  */
 #[Fillable([
-    'patient_id', 'visit_id', 'encounter_id', 'administered_by',
+    'concept_id', 'patient_id', 'visit_id', 'encounter_id', 'administered_by',
     'vaccine', 'dose_label', 'batch_no', 'site', 'route', 'notes', 'administered_at',
 ])]
 class Immunization extends Model implements AuditableRecord
@@ -81,5 +81,15 @@ class Immunization extends Model implements AuditableRecord
     public function administeredBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'administered_by');
+    }
+
+    /**
+     * The terminology concept this entry is coded to, when it is.
+     *
+     * @return BelongsTo<Concept, $this>
+     */
+    public function concept(): BelongsTo
+    {
+        return $this->belongsTo(Concept::class);
     }
 }

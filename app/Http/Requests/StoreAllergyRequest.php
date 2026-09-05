@@ -19,6 +19,7 @@ class StoreAllergyRequest extends FormRequest
     {
         return [
             'substance' => ['required', 'string', 'max:255'],
+            'concept_id' => ['nullable', 'integer', Rule::exists('concepts', 'id')->where('class', 'allergen')],
             'category' => ['nullable', Rule::in(['drug', 'food', 'environmental'])],
             'reaction' => ['nullable', 'string', 'max:255'],
             'severity' => ['nullable', Rule::in(['mild', 'moderate', 'severe'])],

@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\IdentifierType;
+use App\Models\Patient;
+use App\Services\PatientIdentifiers;
 use App\Support\NigeriaLocations;
 use App\Support\PatientOptions;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -23,9 +26,23 @@ class StorePatientRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $nin = trim((string) $this->input('nin', ''));
+
         $this->merge([
             'is_transfer' => $this->boolean('is_transfer'),
+            'dob_estimated' => $this->boolean('dob_estimated'),
+            'nin' => $nin === '' ? null : IdentifierType::Nin->normalise($nin),
         ]);
+    }
+
+    /**
+     * The patient being edited, when this is an update.
+     */
+    protected function editing(): ?Patient
+    {
+        $patient = $this->route('patient');
+
+        return $patient instanceof Patient ? $patient : null;
     }
 
     /**
@@ -41,8 +58,20 @@ class StorePatientRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:100'],
             'other_names' => ['nullable', 'string', 'max:100'],
             'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'dob_estimated' => ['boolean'],
             'sex' => ['required', Rule::in(array_keys(PatientOptions::SEXES))],
             'marital_status' => ['nullable', Rule::in(PatientOptions::MARITAL_STATUSES)],
+            'nin' => [
+                'nullable',
+                'digits:11',
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    $holder = app(PatientIdentifiers::class)->holderOf(IdentifierType::Nin, (string) $value);
+
+                    if ($holder !== null && $holder->isNot($this->editing())) {
+                        $fail("This NIN is already on record for {$holder->fullName()} ({$holder->file_number}). Open that record instead of registering again.");
+                    }
+                },
+            ],
             'phone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string', 'max:500'],
@@ -58,6 +87,7 @@ class StorePatientRequest extends FormRequest
                     }
                 },
             ],
+            'ward' => ['nullable', 'string', 'max:100'],
 
             'next_of_kin_name' => ['nullable', 'string', 'max:150'],
             'next_of_kin_relationship' => ['nullable', Rule::in(PatientOptions::NOK_RELATIONSHIPS)],

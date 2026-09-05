@@ -290,7 +290,7 @@ class ReportRegistry
      */
     private function patientRegister(Carbon $from, Carbon $to): array
     {
-        $patients = Patient::whereBetween('created_at', [$from, $to])->latest()->get();
+        $patients = Patient::query()->current()->whereBetween('created_at', [$from, $to])->latest()->get();
 
         $rows = $patients->map(fn (Patient $p) => [
             'file_number' => $p->file_number,

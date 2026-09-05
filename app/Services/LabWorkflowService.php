@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\LabOrderStatus;
+use App\Enums\NumberKind;
 use App\Enums\Priority;
+use App\Events\LabResultVerified;
 use App\Models\BillCharge;
 use App\Models\Encounter;
 use App\Models\LabOrder;
@@ -15,7 +17,6 @@ use App\Models\User;
 use App\Models\Visit;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Drives the laboratory requisition lifecycle: placing an order (expanding
@@ -24,7 +25,12 @@ use Illuminate\Support\Str;
  */
 class LabWorkflowService
 {
-    public function __construct(private readonly BillingService $billing) {}
+    public function __construct(
+        private readonly BillingService $billing,
+        private readonly NumberSequences $numbers,
+        private readonly DomainEvents $events,
+        private readonly AuditTrail $audit,
+    ) {}
 
     /**
      * Place a requisition for a patient. Catalog panels are expanded into their
@@ -46,7 +52,7 @@ class LabWorkflowService
     ): LabOrder {
         return DB::transaction(function () use ($patient, $orderedBy, $tests, $adHoc, $priority, $clinicalDetails, $visit, $encounter, $queueEntry) {
             $order = LabOrder::create([
-                'accession_number' => 'TMP-'.Str::uuid(),
+                'accession_number' => $this->numbers->next(NumberKind::LabOrder),
                 'patient_id' => $patient->id,
                 'visit_id' => $visit?->id,
                 'encounter_id' => $encounter?->id,
@@ -55,10 +61,6 @@ class LabWorkflowService
                 'priority' => $priority,
                 'status' => LabOrderStatus::Ordered,
                 'clinical_details' => $clinicalDetails,
-            ]);
-
-            $order->update([
-                'accession_number' => sprintf('LAB/%d/%06d', $order->created_at->year, $order->id),
             ]);
 
             // Expand catalog tests (panels → components) into result lines.
@@ -159,6 +161,8 @@ class LabWorkflowService
                     'resulted_by' => $result->resulted_by ?? $actor->id,
                     'resulted_at' => $result->resulted_at ?? now(),
                 ]);
+
+                $this->events->publish(new LabResultVerified($result, $actor));
             }
 
             $order->update([
@@ -210,10 +214,10 @@ class LabWorkflowService
      */
     public function cancel(LabOrder $order, User $actor, ?string $reason = null): LabOrder
     {
-        $order->update([
+        $this->audit->withReason($reason, fn () => $order->update([
             'status' => LabOrderStatus::Cancelled,
             'cancelled_reason' => $reason,
-        ]);
+        ]));
 
         return $order;
     }
@@ -225,6 +229,7 @@ class LabWorkflowService
     {
         $order->results()->create([
             'lab_test_id' => $analyte->id,
+            'catalogue_version_id' => $analyte->currentVersion()->id,
             'patient_id' => $patient->id,
             'visit_id' => $order->visit_id,
             'encounter_id' => $order->encounter_id,

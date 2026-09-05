@@ -38,7 +38,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  */
 #[Fillable([
-    'lab_order_id', 'lab_test_id', 'patient_id', 'visit_id', 'encounter_id',
+    'lab_order_id', 'lab_test_id', 'catalogue_version_id', 'patient_id', 'visit_id', 'encounter_id',
     'ordered_by', 'resulted_by', 'name', 'code', 'department', 'value', 'unit',
     'reference_range', 'reference_low', 'reference_high', 'flag', 'specimen',
     'status', 'resulted_at', 'notes',
@@ -142,5 +142,15 @@ class LabResult extends Model implements AuditableRecord
     public function resultedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'resulted_by');
+    }
+
+    /**
+     * The catalogue version the record was made under.
+     *
+     * @return BelongsTo<CatalogueVersion, $this>
+     */
+    public function version(): BelongsTo
+    {
+        return $this->belongsTo(CatalogueVersion::class, 'catalogue_version_id');
     }
 }

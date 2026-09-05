@@ -24,6 +24,7 @@ class MedicationResource extends JsonResource
             'frequency' => $this->frequency,
             'route' => $this->route,
             'status' => $this->status,
+            'concept_id' => $this->concept_id,
         ];
     }
 }

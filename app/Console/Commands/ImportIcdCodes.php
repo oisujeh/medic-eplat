@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\AuditLog;
 use App\Models\IcdCode;
+use App\Services\AuditTrail;
 use Illuminate\Console\Command;
 
 class ImportIcdCodes extends Command
@@ -26,7 +28,7 @@ class ImportIcdCodes extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(AuditTrail $audit): int
     {
         $path = (string) $this->argument('path');
 
@@ -37,11 +39,48 @@ class ImportIcdCodes extends Command
         }
 
         $handle = fopen($path, 'r');
+
+        if ($handle === false) {
+            $this->error("Cannot open {$path}.");
+
+            return self::FAILURE;
+        }
+
         $delimiter = $this->detectDelimiter($path);
         $seen = [];
         $imported = 0;
         $skipped = 0;
+        $deactivated = 0;
 
+        // Thousands of catalogue rows would swamp the trail; the import is
+        // recorded once, as a whole, below.
+        $audit->withoutRecording(function () use ($handle, $delimiter, &$seen, &$imported, &$skipped, &$deactivated): void {
+            $this->importRows($handle, $delimiter, $seen, $imported, $skipped);
+
+            if ($this->option('deactivate-missing') && $seen !== []) {
+                $deactivated = IcdCode::query()->whereNotIn('code', $seen)->update(['is_active' => false]);
+                $this->line("Deactivated {$deactivated} codes not in the file.");
+            }
+        });
+
+        $audit->record(
+            AuditLog::ACTION_IMPORTED,
+            label: "ICD-10 import from {$path}: {$imported} codes loaded, {$skipped} rows skipped, {$deactivated} deactivated",
+        );
+
+        $this->info("Imported {$imported} codes, skipped {$skipped} rows.");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Load every valid row into the catalogue.
+     *
+     * @param  resource  $handle
+     * @param  list<string>  $seen
+     */
+    private function importRows($handle, string $delimiter, array &$seen, int &$imported, int &$skipped): void
+    {
         while (($row = $this->readRow($handle, $delimiter)) !== false) {
             $code = trim((string) ($row[0] ?? ''));
             $description = trim((string) ($row[1] ?? ''));
@@ -68,15 +107,6 @@ class ImportIcdCodes extends Command
         }
 
         fclose($handle);
-
-        if ($this->option('deactivate-missing') && $seen !== []) {
-            $deactivated = IcdCode::query()->whereNotIn('code', $seen)->update(['is_active' => false]);
-            $this->line("Deactivated {$deactivated} codes not in the file.");
-        }
-
-        $this->info("Imported {$imported} codes, skipped {$skipped} rows.");
-
-        return self::SUCCESS;
     }
 
     /**

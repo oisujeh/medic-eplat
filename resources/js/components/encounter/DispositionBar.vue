@@ -83,6 +83,11 @@ const signLabel = computed(() => `Sign ${encounter.type_label.toLowerCase()}`);
                         @click="form.next_service_point_id = String(sp.id)"
                     >
                         {{ sp.name }}
+                        <span
+                            v-if="sp.is_default"
+                            class="ml-1 text-[11px] font-medium text-primary"
+                            >· suggested</span
+                        >
                     </button>
                 </div>
             </div>

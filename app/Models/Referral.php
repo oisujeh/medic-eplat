@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\Priority;
 use App\Enums\ReferralStatus;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -45,7 +46,7 @@ use Illuminate\Support\Carbon;
 ])]
 class Referral extends Model implements AuditableRecord
 {
-    use Auditable;
+    use Auditable, HasPublicId;
 
     /**
      * Get the attributes that should be cast.

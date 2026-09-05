@@ -10,6 +10,8 @@ export type Personnel = { id: number; name: string };
 export type ServicePointOption = {
     id: number;
     name: string;
+    /** The step the patient's pathway suggests next. */
+    is_default: boolean;
     personnel: Personnel[];
 };
 
@@ -25,7 +27,33 @@ export type PatientBanner = {
     dob: string | null;
     phone: string | null;
     address: string | null;
+    deceased: boolean;
     url: string;
+};
+
+/** One event on the patient's longitudinal timeline. */
+export type TimelineEntry = {
+    key: string;
+    kind: string;
+    kind_label: string;
+    icon: string;
+    at_iso: string;
+    date: string;
+    date_label: string;
+    time: string;
+    title: string;
+    detail: string | null;
+    badge: string | null;
+    tone: string;
+    href: string | null;
+    by: string | null;
+};
+
+export type TimelineKindOption = {
+    value: string;
+    label: string;
+    icon: string;
+    count: number;
 };
 
 export type EncounterType =
@@ -204,6 +232,7 @@ export type Medication = {
     frequency: string | null;
     route: string | null;
     status: string;
+    concept_id: number | null;
 };
 
 /** AllergyResource */
@@ -213,6 +242,7 @@ export type Allergy = {
     reaction: string | null;
     severity: string | null;
     category: string | null;
+    concept_id: number | null;
 };
 
 /** LabResultResource */
@@ -252,6 +282,7 @@ export type Immunization = {
     batch_no: string | null;
     site: string | null;
     route: string | null;
+    concept_id: number | null;
     administered_at: string | null;
 };
 

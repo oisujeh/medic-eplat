@@ -16,6 +16,7 @@ return new class extends Migration
     {
         Schema::create('admissions', function (Blueprint $table) {
             $table->id();
+            $table->ulid('ulid')->unique();
             $table->string('admission_number')->unique();
             $table->foreignId('patient_id')->constrained()->cascadeOnDelete();
             $table->foreignId('visit_id')->nullable()->constrained()->nullOnDelete();

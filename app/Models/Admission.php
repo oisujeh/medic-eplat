@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AdmissionStatus;
 use App\Enums\DischargeType;
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
 use Database\Factories\AdmissionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -51,7 +52,7 @@ use Illuminate\Support\Carbon;
 class Admission extends Model implements AuditableRecord
 {
     /** @use HasFactory<AdmissionFactory> */
-    use Auditable, HasFactory;
+    use Auditable, HasFactory, HasPublicId;
 
     /**
      * Get the attributes that should be cast.

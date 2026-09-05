@@ -18,6 +18,7 @@ return new class extends Migration
             $table->id();
             $table->string('code')->unique();                 // SKU
             $table->string('name');
+            $table->foreignId('concept_id')->nullable()->constrained()->nullOnDelete();
             $table->string('category')->default('drug');      // App\Enums\InventoryCategory
             $table->string('form')->nullable();               // Tablet, Capsule, Injection…
             $table->string('strength')->nullable();           // 500mg, 5mg/5ml…
