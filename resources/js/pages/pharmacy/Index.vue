@@ -98,7 +98,7 @@ function money(v: number): string {
                                             ? ' · ' + item.patient.age + 'y'
                                             : ''
                                     }}
-                                    · {{ item.pending_scripts }} script(s)
+                                    · {{ item.pending_scripts }} to dispense
                                 </p>
                             </div>
                         </div>

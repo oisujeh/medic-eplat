@@ -14,6 +14,9 @@ enum Permission: string
     case CancelLabOrders = 'laboratory.cancel_orders';
     case Dispense = 'pharmacy.dispense';
     case AdjustStock = 'inventory.adjust_stock';
+    case ApproveRequisitions = 'inventory.approve_requisitions';
+    case IssueStock = 'inventory.issue_stock';
+    case ManageInventorySettings = 'inventory.manage_settings';
     case RecordPayments = 'billing.record_payments';
     case ManageFees = 'billing.manage_fees';
     case ManageClaims = 'claims.manage';
@@ -33,6 +36,9 @@ enum Permission: string
             self::CancelLabOrders => 'Cancel laboratory orders',
             self::Dispense => 'Dispense medicines',
             self::AdjustStock => 'Adjust stock counts',
+            self::ApproveRequisitions => 'Approve stock requisitions',
+            self::IssueStock => 'Issue stock against requisitions',
+            self::ManageInventorySettings => 'Set reorder planning parameters',
             self::RecordPayments => 'Record payments',
             self::ManageFees => 'Manage the fee schedule',
             self::ManageClaims => 'Authorise, submit, remit and reject claims',
@@ -67,6 +73,9 @@ enum Permission: string
             self::CancelLabOrders => ['laboratory-staff', 'physician', 'chief-medical-director'],
             self::Dispense => ['pharmacy-staff', 'chief-medical-director'],
             self::AdjustStock => ['inventory-officer', 'pharmacy-staff', 'chief-medical-director'],
+            self::ApproveRequisitions => ['inventory-officer', 'chief-medical-director'],
+            self::IssueStock => ['inventory-officer', 'chief-medical-director'],
+            self::ManageInventorySettings => ['inventory-officer', 'chief-medical-director'],
             self::RecordPayments => ['cashier', 'chief-medical-director'],
             self::ManageFees => ['cashier', 'chief-medical-director'],
             self::ManageClaims => ['cashier', 'chief-medical-director'],

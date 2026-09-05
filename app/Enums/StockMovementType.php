@@ -8,10 +8,12 @@ namespace App\Enums;
  */
 enum StockMovementType: string
 {
-    case Receipt = 'receipt';       // stock received into a batch
-    case Issue = 'issue';           // stock issued out (e.g. dispensed)
-    case Adjustment = 'adjustment'; // manual correction (count, damage, loss)
-    case Return = 'return';         // stock returned into store
+    case Receipt = 'receipt';           // stock received into a batch
+    case Issue = 'issue';               // stock issued out (e.g. dispensed)
+    case Adjustment = 'adjustment';     // manual correction (count, damage, loss)
+    case Return = 'return';             // stock returned into store
+    case TransferOut = 'transfer_out';  // left a location on a requisition
+    case TransferIn = 'transfer_in';    // arrived at a location on a requisition
 
     /**
      * Human-readable label.
@@ -23,6 +25,17 @@ enum StockMovementType: string
             self::Issue => 'Issue',
             self::Adjustment => 'Adjustment',
             self::Return => 'Return',
+            self::TransferOut => 'Transfer out',
+            self::TransferIn => 'Transfer in',
         };
+    }
+
+    /**
+     * Whether the movement is consumption: stock that left the facility's
+     * hands, as opposed to a correction or a move between locations.
+     */
+    public function isConsumption(): bool
+    {
+        return $this === self::Issue;
     }
 }

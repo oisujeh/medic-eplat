@@ -7,6 +7,7 @@ use App\Events\MedicationPrescribed;
 use App\Http\Controllers\Concerns\AssertsEncounterRecord;
 use App\Http\Requests\MedicationRequest;
 use App\Models\Encounter;
+use App\Models\InventoryItem;
 use App\Models\Medication;
 use App\Services\DomainEvents;
 use App\Services\Terminology;
@@ -26,11 +27,10 @@ class MedicationController extends Controller
      */
     public function store(MedicationRequest $request, Encounter $encounter, DomainEvents $events, Terminology $terminology): RedirectResponse
     {
-        $data = $request->validated();
+        $data = $this->coded($request->validated(), $terminology);
 
         $medication = $encounter->patient->medications()->create([
             ...$data,
-            'concept_id' => $terminology->code(ConceptClass::Drug, $data['concept_id'] ?? null, $data['name']),
             'status' => Medication::STATUS_ACTIVE,
             'visit_id' => $encounter->visit_id,
             'encounter_id' => $encounter->id,
@@ -52,16 +52,30 @@ class MedicationController extends Controller
     {
         $this->assertBelongsToPatient($encounter, $medication);
 
-        $data = $request->validated();
-
-        $medication->update([
-            ...$data,
-            'concept_id' => $terminology->code(ConceptClass::Drug, $data['concept_id'] ?? null, $data['name']),
-        ]);
+        $medication->update($this->coded($request->validated(), $terminology));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Medication updated.']);
 
         return back();
+    }
+
+    /**
+     * Code the entry: the concept chosen or matched by name, and the drug
+     * concept of the chosen product when the prescriber picked one without
+     * naming a concept.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function coded(array $data, Terminology $terminology): array
+    {
+        $product = isset($data['inventory_item_id']) ? InventoryItem::find((int) $data['inventory_item_id']) : null;
+
+        $data['inventory_item_id'] = $product?->id;
+        $data['concept_id'] = $terminology->code(ConceptClass::Drug, $data['concept_id'] ?? null, $data['name'])
+            ?? $product?->concept_id;
+
+        return $data;
     }
 
     /**

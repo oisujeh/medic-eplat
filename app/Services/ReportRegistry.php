@@ -9,6 +9,7 @@ use App\Enums\BillStatus;
 use App\Enums\ClaimStatus;
 use App\Enums\LabOrderStatus;
 use App\Enums\MaternalOutcome;
+use App\Enums\MedicationFulfilment;
 use App\Enums\ReferralStatus;
 use App\Models\Admission;
 use App\Models\Appointment;
@@ -21,11 +22,15 @@ use App\Models\DispenseItem;
 use App\Models\Encounter;
 use App\Models\InventoryItem;
 use App\Models\LabOrder;
+use App\Models\Medication;
 use App\Models\Patient;
 use App\Models\Payment;
 use App\Models\Referral;
 use App\Models\StockBatch;
+use App\Models\StockLocation;
+use App\Models\StockRequisition;
 use App\Models\Ward;
+use App\Support\ReorderSuggestion;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -40,6 +45,7 @@ class ReportRegistry
     public function __construct(
         private readonly NhmisReports $nhmis,
         private readonly SurveillanceReports $surveillance,
+        private readonly StockReorder $reorder,
     ) {}
 
     /**
@@ -89,10 +95,14 @@ class ReportRegistry
 
             ['key' => 'dispensing-log', 'name' => 'Dispensing Log', 'category' => 'pharmacy', 'description' => 'Medications dispensed within the period.', 'icon' => 'Pill', 'type' => 'table', 'featured' => false],
             ['key' => 'top-dispensed', 'name' => 'Top Dispensed Items', 'category' => 'pharmacy', 'description' => 'Highest-volume items by quantity.', 'icon' => 'TrendingUp', 'type' => 'table', 'featured' => true],
+            ['key' => 'prescription-fulfilment', 'name' => 'Prescription Fulfilment', 'category' => 'pharmacy', 'description' => 'Prescriptions written within the period and whether the pharmacy supplied them.', 'icon' => 'ClipboardCheck', 'type' => 'table', 'featured' => false],
 
             ['key' => 'low-stock', 'name' => 'Low Stock', 'category' => 'inventory', 'description' => 'Items at or below their reorder level.', 'icon' => 'PackageMinus', 'type' => 'table', 'featured' => true],
+            ['key' => 'reorder-suggestions', 'name' => 'Reorder Suggestions', 'category' => 'inventory', 'description' => 'Consumption-based reorder levels and order quantities.', 'icon' => 'ShoppingCart', 'type' => 'table', 'featured' => true],
             ['key' => 'stock-valuation', 'name' => 'Stock Valuation', 'category' => 'inventory', 'description' => 'On-hand quantity and value by item.', 'icon' => 'Package', 'type' => 'table', 'featured' => false],
+            ['key' => 'stock-by-location', 'name' => 'Stock by Location', 'category' => 'inventory', 'description' => 'Where each item is held.', 'icon' => 'Warehouse', 'type' => 'table', 'featured' => false],
             ['key' => 'expiring-batches', 'name' => 'Expiring Batches', 'category' => 'inventory', 'description' => 'Batches expiring within 90 days.', 'icon' => 'CalendarClock', 'type' => 'table', 'featured' => false],
+            ['key' => 'requisition-register', 'name' => 'Requisition Register', 'category' => 'inventory', 'description' => 'Stock requisitions raised within the period.', 'icon' => 'ArrowLeftRight', 'type' => 'table', 'featured' => false],
 
             ['key' => 'appointments-log', 'name' => 'Appointments Log', 'category' => 'appointments', 'description' => 'Appointments scheduled within the period.', 'icon' => 'CalendarDays', 'type' => 'table', 'featured' => false],
             ['key' => 'no-shows', 'name' => 'No-shows', 'category' => 'appointments', 'description' => 'Appointments recorded as no-shows.', 'icon' => 'CalendarX', 'type' => 'table', 'featured' => false],
@@ -149,9 +159,13 @@ class ReportRegistry
             'lab-turnaround' => $this->labTurnaround($from, $to),
             'dispensing-log' => $this->dispensingLog($from, $to),
             'top-dispensed' => $this->topDispensed($from, $to),
+            'prescription-fulfilment' => $this->prescriptionFulfilment($from, $to),
             'low-stock' => $this->lowStock(),
+            'reorder-suggestions' => $this->reorderSuggestions(),
             'stock-valuation' => $this->stockValuation(),
+            'stock-by-location' => $this->stockByLocation(),
             'expiring-batches' => $this->expiringBatches(),
+            'requisition-register' => $this->requisitionRegister($from, $to),
             'appointments-log' => $this->appointmentsLog($from, $to),
             'no-shows' => $this->noShows($from, $to),
             'admissions-log' => $this->admissionsLog($from, $to),
@@ -579,7 +593,186 @@ class ReportRegistry
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function prescriptionFulfilment(Carbon $from, Carbon $to): array
+    {
+        $medications = Medication::query()
+            ->whereBetween('created_at', [$from, $to])
+            ->with(['patient:id,file_number,surname,first_name,other_names', 'prescribedBy:id,name', 'product:id,name,strength,form'])
+            ->latest()
+            ->get();
+
+        $rows = $medications->map(fn (Medication $m) => [
+            'date' => $m->created_at?->isoFormat('D MMM YYYY') ?? '—',
+            'patient' => $m->patient?->fullName() ?? '—',
+            'prescription' => $m->label(),
+            'product' => $m->product?->label() ?? ($m->concept_id ? 'Coded, not stocked' : 'Free text'),
+            'quantity' => $m->quantity !== null ? (string) $m->quantity : '—',
+            'dispensed' => (string) $m->quantity_dispensed,
+            'fulfilment' => $m->fulfilment->label(),
+            'prescriber' => $m->prescribedBy?->name ?? '—',
+        ])->all();
+
+        $byFulfilment = $medications->countBy(fn (Medication $m) => $m->fulfilment->value);
+        $supplied = ($byFulfilment->get(MedicationFulfilment::Dispensed->value, 0) + $byFulfilment->get(MedicationFulfilment::Partial->value, 0));
+        $inScope = $medications->count() - $byFulfilment->get(MedicationFulfilment::External->value, 0);
+
+        return [
+            'columns' => [
+                ['key' => 'date', 'label' => 'Prescribed', 'align' => 'left'],
+                ['key' => 'patient', 'label' => 'Patient', 'align' => 'left'],
+                ['key' => 'prescription', 'label' => 'Prescription', 'align' => 'left'],
+                ['key' => 'product', 'label' => 'Product', 'align' => 'left'],
+                ['key' => 'quantity', 'label' => 'Prescribed qty', 'align' => 'right'],
+                ['key' => 'dispensed', 'label' => 'Dispensed qty', 'align' => 'right'],
+                ['key' => 'fulfilment', 'label' => 'Fulfilment', 'align' => 'left'],
+                ['key' => 'prescriber', 'label' => 'Prescriber', 'align' => 'left'],
+            ],
+            'rows' => $rows,
+            'summary' => [
+                ['label' => 'Prescriptions', 'value' => (string) $medications->count()],
+                ['label' => 'Fully dispensed', 'value' => (string) $byFulfilment->get(MedicationFulfilment::Dispensed->value, 0)],
+                ['label' => 'Partly dispensed', 'value' => (string) $byFulfilment->get(MedicationFulfilment::Partial->value, 0)],
+                ['label' => 'Still to dispense', 'value' => (string) $byFulfilment->get(MedicationFulfilment::Pending->value, 0)],
+                ['label' => 'Sourced outside', 'value' => (string) $byFulfilment->get(MedicationFulfilment::External->value, 0)],
+                ['label' => 'Fill rate', 'value' => $inScope > 0 ? round($supplied / $inScope * 100).'%' : '—'],
+            ],
+        ];
+    }
+
     // --------------------------------------------------------------- Inventory
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function reorderSuggestions(): array
+    {
+        $settings = $this->reorder->settings();
+
+        $rows = $this->reorder->suggestions()->map(fn (ReorderSuggestion $s) => [
+            'name' => $s->item->label(),
+            'amc' => $s->isConsumed() ? number_format($s->averageMonthlyConsumption, 1) : '—',
+            'on_hand' => $s->onHand.($s->item->unit ? ' '.$s->item->unit : ''),
+            'cover' => $s->monthsOfCover !== null ? number_format($s->monthsOfCover, 1).' mo' : '—',
+            'reorder_level' => (string) $s->item->reorder_level,
+            'suggested_level' => $s->isConsumed() ? (string) $s->suggestedReorderLevel : '—',
+            'order_quantity' => $s->isConsumed() ? (string) $s->suggestedOrderQuantity : '—',
+            'action' => $s->needsOrder ? 'Order now' : ($s->isConsumed() ? 'Adequate' : 'No consumption'),
+        ])->all();
+
+        $needing = collect($rows)->where('action', 'Order now')->count();
+
+        return [
+            'columns' => [
+                ['key' => 'name', 'label' => 'Item', 'align' => 'left'],
+                ['key' => 'amc', 'label' => 'Avg monthly use', 'align' => 'right'],
+                ['key' => 'on_hand', 'label' => 'On hand', 'align' => 'right'],
+                ['key' => 'cover', 'label' => 'Cover', 'align' => 'right'],
+                ['key' => 'reorder_level', 'label' => 'Reorder at', 'align' => 'right'],
+                ['key' => 'suggested_level', 'label' => 'Suggested reorder at', 'align' => 'right'],
+                ['key' => 'order_quantity', 'label' => 'Suggested order', 'align' => 'right'],
+                ['key' => 'action', 'label' => 'Action', 'align' => 'left'],
+            ],
+            'rows' => $rows,
+            'summary' => [
+                ['label' => 'Items to order', 'value' => (string) $needing],
+                ['label' => 'Window', 'value' => $settings['consumption_window_days'].' days'],
+                ['label' => 'Lead time', 'value' => $settings['lead_time_days'].' days'],
+                ['label' => 'Cover target', 'value' => $settings['min_cover_months'].'–'.$settings['max_cover_months'].' months'],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function stockByLocation(): array
+    {
+        $locations = StockLocation::query()->active()->get();
+
+        $held = StockBatch::query()
+            ->selectRaw('inventory_item_id, stock_location_id, sum(quantity) as quantity')
+            ->groupBy('inventory_item_id', 'stock_location_id')
+            ->get()
+            ->groupBy('inventory_item_id');
+
+        $rows = InventoryItem::where('is_active', true)->orderBy('name')->get()->map(function (InventoryItem $i) use ($locations, $held) {
+            $row = ['name' => $i->label(), 'unit' => $i->unit];
+
+            foreach ($locations as $location) {
+                $row['location_'.$location->id] = (string) (int) ($held->get($i->id)?->firstWhere('stock_location_id', $location->id)?->quantity ?? 0);
+            }
+
+            $row['total'] = (string) $i->quantity_on_hand;
+
+            return $row;
+        })->all();
+
+        return [
+            'columns' => [
+                ['key' => 'name', 'label' => 'Item', 'align' => 'left'],
+                ['key' => 'unit', 'label' => 'Unit', 'align' => 'left'],
+                ...$locations->map(fn (StockLocation $l) => ['key' => 'location_'.$l->id, 'label' => $l->name, 'align' => 'right'])->all(),
+                ['key' => 'total', 'label' => 'Total', 'align' => 'right'],
+            ],
+            'rows' => $rows,
+            'summary' => [
+                ['label' => 'Locations', 'value' => (string) $locations->count()],
+                ['label' => 'Items', 'value' => (string) count($rows)],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function requisitionRegister(Carbon $from, Carbon $to): array
+    {
+        $requisitions = StockRequisition::query()
+            ->whereBetween('requested_at', [$from, $to])
+            ->with(['fromLocation:id,name', 'toLocation:id,name', 'requestedBy:id,name'])
+            ->withCount('lines')
+            ->withSum('lines as requested_total', 'quantity_requested')
+            ->withSum('lines as issued_total', 'quantity_issued')
+            ->withSum('lines as received_total', 'quantity_received')
+            ->latest('requested_at')
+            ->get();
+
+        $rows = $requisitions->map(fn (StockRequisition $r) => [
+            'number' => $r->number,
+            'date' => $r->requested_at?->isoFormat('D MMM YYYY') ?? '—',
+            'from' => $r->fromLocation?->name ?? '—',
+            'to' => $r->toLocation?->name ?? '—',
+            'lines' => (string) $r->lines_count,
+            'requested' => (string) (int) ($r->requested_total ?? 0),
+            'issued' => (string) (int) ($r->issued_total ?? 0),
+            'received' => (string) (int) ($r->received_total ?? 0),
+            'status' => $r->status->label(),
+            'requested_by' => $r->requestedBy?->name ?? '—',
+        ])->all();
+
+        return [
+            'columns' => [
+                ['key' => 'number', 'label' => 'Number', 'align' => 'left'],
+                ['key' => 'date', 'label' => 'Raised', 'align' => 'left'],
+                ['key' => 'from', 'label' => 'From', 'align' => 'left'],
+                ['key' => 'to', 'label' => 'To', 'align' => 'left'],
+                ['key' => 'lines', 'label' => 'Lines', 'align' => 'right'],
+                ['key' => 'requested', 'label' => 'Requested', 'align' => 'right'],
+                ['key' => 'issued', 'label' => 'Issued', 'align' => 'right'],
+                ['key' => 'received', 'label' => 'Received', 'align' => 'right'],
+                ['key' => 'status', 'label' => 'Status', 'align' => 'left'],
+                ['key' => 'requested_by', 'label' => 'Raised by', 'align' => 'left'],
+            ],
+            'rows' => $rows,
+            'summary' => [
+                ['label' => 'Requisitions', 'value' => (string) $requisitions->count()],
+                ['label' => 'Open', 'value' => (string) $requisitions->filter(fn (StockRequisition $r) => $r->status->isOpen())->count()],
+            ],
+        ];
+    }
 
     /**
      * @return array<string, mixed>

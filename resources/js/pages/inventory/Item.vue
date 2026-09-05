@@ -12,6 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 type Batch = {
     id: number;
@@ -19,6 +26,7 @@ type Batch = {
     expiry_date: string | null;
     quantity: number;
     is_expired: boolean;
+    location: string | null;
 };
 
 const props = defineProps<{
@@ -35,12 +43,21 @@ const props = defineProps<{
         reorder_level: number;
         is_low: boolean;
     };
+    locations: Array<{
+        id: number;
+        slug: string;
+        name: string;
+        kind: string;
+        on_hand: number;
+    }>;
+    receiving_location_id: number;
     batches: Batch[];
     movements: Array<{
         id: number;
         type: string;
         quantity_change: number;
         reason: string | null;
+        location: string | null;
         at: string | null;
     }>;
 }>();
@@ -59,6 +76,7 @@ const receiveForm = useForm({
     batch_number: '',
     expiry_date: '',
     cost_price: '',
+    stock_location_id: String(props.receiving_location_id),
 });
 
 const adjustBatch = ref<Batch | null>(null);
@@ -67,7 +85,13 @@ const adjustForm = useForm({ delta: '', reason: '' });
 function receive() {
     receiveForm.post(`/inventory/${props.item.id}/receive`, {
         preserveScroll: true,
-        onSuccess: () => receiveForm.reset(),
+        onSuccess: () =>
+            receiveForm.reset(
+                'quantity',
+                'batch_number',
+                'expiry_date',
+                'cost_price',
+            ),
     });
 }
 
@@ -152,6 +176,21 @@ function money(v: number | null): string {
                     </dd>
                 </div>
             </dl>
+            <div
+                v-if="locations.length > 1"
+                class="mt-4 flex flex-wrap gap-2 border-t border-border pt-3"
+            >
+                <span
+                    v-for="l in locations"
+                    :key="l.id"
+                    class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs"
+                >
+                    <span class="text-muted-foreground">{{ l.name }}</span>
+                    <span class="font-semibold text-foreground"
+                        >{{ l.on_hand }} {{ item.unit }}</span
+                    >
+                </span>
+            </div>
         </div>
 
         <!-- Receive stock -->
@@ -160,7 +199,7 @@ function money(v: number | null): string {
                 <PackagePlus class="size-4 text-primary" />
                 Receive stock
             </h2>
-            <form class="grid gap-3 sm:grid-cols-4" @submit.prevent="receive">
+            <form class="grid gap-3 sm:grid-cols-5" @submit.prevent="receive">
                 <div class="grid gap-1.5">
                     <Label>Quantity *</Label>
                     <Input
@@ -187,7 +226,26 @@ function money(v: number | null): string {
                         step="0.01"
                     />
                 </div>
-                <div class="sm:col-span-4">
+                <div class="grid gap-1.5">
+                    <Label>Into</Label>
+                    <Select v-model="receiveForm.stock_location_id">
+                        <SelectTrigger class="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="l in locations"
+                                :key="l.id"
+                                :value="String(l.id)"
+                                >{{ l.name }}</SelectItem
+                            >
+                        </SelectContent>
+                    </Select>
+                    <InputError
+                        :message="receiveForm.errors.stock_location_id"
+                    />
+                </div>
+                <div class="sm:col-span-5">
                     <Button type="submit" :disabled="receiveForm.processing">
                         <PackagePlus class="size-4" />
                         Receive
@@ -206,6 +264,7 @@ function money(v: number | null): string {
                             class="border-b border-border text-left text-xs text-muted-foreground"
                         >
                             <th class="py-2 pr-3 font-medium">Batch</th>
+                            <th class="py-2 pr-3 font-medium">Location</th>
                             <th class="py-2 pr-3 font-medium">Expiry</th>
                             <th class="py-2 pr-3 font-medium">Qty</th>
                             <th class="py-2 font-medium"></th>
@@ -215,6 +274,9 @@ function money(v: number | null): string {
                         <tr v-for="b in batches" :key="b.id">
                             <td class="py-2 pr-3 font-mono text-xs">
                                 {{ b.batch_number ?? '—' }}
+                            </td>
+                            <td class="py-2 pr-3 text-muted-foreground">
+                                {{ b.location ?? '—' }}
                             </td>
                             <td class="py-2 pr-3">
                                 <span
@@ -247,7 +309,7 @@ function money(v: number | null): string {
                         </tr>
                         <tr v-if="!batches.length">
                             <td
-                                colspan="4"
+                                colspan="5"
                                 class="py-6 text-center text-sm text-muted-foreground"
                             >
                                 No batches yet.
@@ -272,6 +334,12 @@ function money(v: number | null): string {
                 >
                     <span>
                         <span class="font-medium">{{ m.type }}</span>
+                        <span
+                            v-if="m.location"
+                            class="text-xs text-muted-foreground"
+                        >
+                            · {{ m.location }}</span
+                        >
                         <span
                             v-if="m.reason"
                             class="text-xs text-muted-foreground"

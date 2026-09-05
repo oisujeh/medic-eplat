@@ -40,6 +40,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportRunnerController;
 use App\Http\Controllers\ServiceChargeController;
 use App\Http\Controllers\SetupController;
+use App\Http\Controllers\StockRequisitionController;
 use App\Http\Controllers\SurveillanceController;
 use App\Http\Controllers\TerminologyController;
 use App\Http\Controllers\VisitController;
@@ -241,13 +242,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('laboratory/{order}/cancel', [LaboratoryController::class, 'cancel'])->name('laboratory.cancel')->middleware('permission:laboratory.cancel_orders');
     });
 
+    // Stocked products for the prescribing form (any clinician).
+    Route::get('products/search', [InventoryController::class, 'products'])->name('products.search');
+
     // Inventory / Store module.
     Route::middleware('module:inventory')->group(function () {
         Route::get('inventory', [InventoryController::class, 'index'])->name('inventory.index');
         Route::post('inventory', [InventoryController::class, 'store'])->name('inventory.store');
+        Route::patch('inventory/settings', [InventoryController::class, 'updateSettings'])->name('inventory.settings.update')->middleware('permission:inventory.manage_settings');
+        Route::post('inventory/reorder-levels/apply', [InventoryController::class, 'applyReorderLevels'])->name('inventory.reorder.apply')->middleware('permission:inventory.manage_settings');
+        Route::post('inventory/batches/{batch}/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust')->middleware('permission:inventory.adjust_stock');
+
+        Route::get('inventory/requisitions', [StockRequisitionController::class, 'index'])->name('inventory.requisitions.index');
+        Route::post('inventory/requisitions', [StockRequisitionController::class, 'store'])->name('inventory.requisitions.store');
+        Route::get('inventory/requisitions/{requisition}', [StockRequisitionController::class, 'show'])->name('inventory.requisitions.show');
+        Route::post('inventory/requisitions/{requisition}/approve', [StockRequisitionController::class, 'approve'])->name('inventory.requisitions.approve')->middleware('permission:inventory.approve_requisitions');
+        Route::post('inventory/requisitions/{requisition}/issue', [StockRequisitionController::class, 'issue'])->name('inventory.requisitions.issue')->middleware('permission:inventory.issue_stock');
+        Route::post('inventory/requisitions/{requisition}/receive', [StockRequisitionController::class, 'receive'])->name('inventory.requisitions.receive');
+        Route::post('inventory/requisitions/{requisition}/cancel', [StockRequisitionController::class, 'cancel'])->name('inventory.requisitions.cancel');
+
         Route::get('inventory/{item}', [InventoryController::class, 'show'])->name('inventory.show');
         Route::post('inventory/{item}/receive', [InventoryController::class, 'receive'])->name('inventory.receive');
-        Route::post('inventory/batches/{batch}/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust')->middleware('permission:inventory.adjust_stock');
     });
 
     // Pharmacy module — dispensing from stock.
@@ -255,6 +270,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('pharmacy', [PharmacyController::class, 'index'])->name('pharmacy.index');
         Route::get('pharmacy/{entry}', [PharmacyController::class, 'show'])->name('pharmacy.dispense');
         Route::post('pharmacy/{entry}/dispense', [PharmacyController::class, 'dispense'])->name('pharmacy.dispense.store')->middleware('permission:pharmacy.dispense');
+        Route::post('pharmacy/{entry}/prescriptions/{medication}/external', [PharmacyController::class, 'markExternal'])->name('pharmacy.prescriptions.external')->middleware('permission:pharmacy.dispense');
+        Route::post('pharmacy/{entry}/prescriptions/{medication}/reopen', [PharmacyController::class, 'reopen'])->name('pharmacy.prescriptions.reopen')->middleware('permission:pharmacy.dispense');
     });
 
     // Billing module — the patient's running bill.

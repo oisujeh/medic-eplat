@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             IcdCodesSeeder::class,
             NotifiableDiseasesSeeder::class,
             LabCompendiumSeeder::class,
+            StockLocationsSeeder::class,
             PharmacyStockSeeder::class,
             TerminologySeeder::class,
             SuperAdminSeeder::class,

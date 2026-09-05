@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\InventoryItem;
 use App\Models\StockBatch;
+use App\Services\StockLocations;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,6 +21,7 @@ class StockBatchFactory extends Factory
     {
         return [
             'inventory_item_id' => InventoryItem::factory(),
+            'stock_location_id' => fn () => app(StockLocations::class)->receiving()->id,
             'batch_number' => strtoupper(fake()->bothify('B####')),
             'expiry_date' => fake()->dateTimeBetween('+3 months', '+2 years')->format('Y-m-d'),
             'quantity' => fake()->numberBetween(10, 200),

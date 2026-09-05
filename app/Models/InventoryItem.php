@@ -72,26 +72,52 @@ class InventoryItem extends Model implements AuditableRecord
     }
 
     /**
-     * Quantity available to dispense right now (excludes expired batches).
+     * Quantity available to dispense right now (excludes expired batches),
+     * at one location or across all of them.
      */
-    public function dispensableQuantity(): int
+    public function dispensableQuantity(?StockLocation $location = null): int
     {
-        return (int) $this->dispensableBatches()->sum('quantity');
+        return (int) $this->dispensableBatches($location)->sum('quantity');
     }
 
     /**
-     * Dispensable batches, first-expiry-first-out (undated batches last).
+     * Quantity held at a location, expired batches included.
+     */
+    public function quantityAt(StockLocation $location): int
+    {
+        return (int) $this->batches()->where('stock_location_id', $location->id)->sum('quantity');
+    }
+
+    /**
+     * Dispensable batches, first-expiry-first-out (undated batches last),
+     * at one location or across all of them.
      *
      * @return HasMany<StockBatch, $this>
      */
-    public function dispensableBatches(): HasMany
+    public function dispensableBatches(?StockLocation $location = null): HasMany
     {
-        return $this->batches()
+        $batches = $this->batches();
+
+        if ($location !== null) {
+            $batches->where('stock_location_id', $location->id);
+        }
+
+        return $batches
             ->where('quantity', '>', 0)
             ->where(fn (Builder $q) => $q->whereNull('expiry_date')->orWhere('expiry_date', '>=', now()->toDateString()))
             ->orderByRaw('expiry_date is null')
             ->orderBy('expiry_date')
             ->orderBy('id');
+    }
+
+    /**
+     * Prescriptions written for this product.
+     *
+     * @return HasMany<Medication, $this>
+     */
+    public function medications(): HasMany
+    {
+        return $this->hasMany(Medication::class);
     }
 
     /**
@@ -130,6 +156,18 @@ class InventoryItem extends Model implements AuditableRecord
     protected function lowStock(Builder $query): void
     {
         $query->whereColumn('quantity_on_hand', '<=', 'reorder_level');
+    }
+
+    /**
+     * Scope to the stocked products of a drug concept: what the pharmacy can
+     * supply against a prescription for that drug.
+     *
+     * @param  Builder<InventoryItem>  $query
+     */
+    #[Scope]
+    protected function productsOf(Builder $query, int $conceptId): void
+    {
+        $query->where('concept_id', $conceptId)->where('is_active', true)->orderBy('strength')->orderBy('form');
     }
 
     /**

@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $inventory_item_id
+ * @property int $stock_location_id
  * @property string|null $batch_number
  * @property Carbon|null $expiry_date
  * @property int $quantity
@@ -22,7 +23,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $received_at
  */
 #[Fillable([
-    'inventory_item_id', 'batch_number', 'expiry_date', 'quantity',
+    'inventory_item_id', 'stock_location_id', 'batch_number', 'expiry_date', 'quantity',
     'cost_price', 'received_by', 'received_at',
 ])]
 class StockBatch extends Model implements AuditableRecord
@@ -59,5 +60,15 @@ class StockBatch extends Model implements AuditableRecord
     public function item(): BelongsTo
     {
         return $this->belongsTo(InventoryItem::class, 'inventory_item_id');
+    }
+
+    /**
+     * Where the batch is held.
+     *
+     * @return BelongsTo<StockLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(StockLocation::class, 'stock_location_id');
     }
 }

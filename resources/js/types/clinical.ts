@@ -231,8 +231,25 @@ export type Medication = {
     dose: string | null;
     frequency: string | null;
     route: string | null;
+    quantity: number | null;
+    duration_days: number | null;
     status: string;
     concept_id: number | null;
+    inventory_item_id: number | null;
+    product_label?: string | null;
+    fulfilment: { value: string; label: string; tone: string };
+    quantity_dispensed: number;
+};
+
+/** A stocked product a prescription can be written for or filled with. */
+export type StockProduct = {
+    id: number;
+    label: string;
+    name: string;
+    unit: string;
+    selling_price: number;
+    quantity_on_hand: number;
+    is_low: boolean;
 };
 
 /** AllergyResource */

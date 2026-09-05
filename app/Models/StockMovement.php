@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $inventory_item_id
  * @property int|null $stock_batch_id
+ * @property int|null $stock_location_id
  * @property StockMovementType $type
  * @property int $quantity_change
  * @property string|null $reason
@@ -24,7 +25,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  */
 #[Fillable([
-    'inventory_item_id', 'stock_batch_id', 'type', 'quantity_change',
+    'inventory_item_id', 'stock_batch_id', 'stock_location_id', 'type', 'quantity_change',
     'reason', 'reference_type', 'reference_id', 'created_by',
 ])]
 class StockMovement extends Model implements AuditableRecord
@@ -50,6 +51,16 @@ class StockMovement extends Model implements AuditableRecord
     public function item(): BelongsTo
     {
         return $this->belongsTo(InventoryItem::class, 'inventory_item_id');
+    }
+
+    /**
+     * Where the movement happened.
+     *
+     * @return BelongsTo<StockLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(StockLocation::class, 'stock_location_id');
     }
 
     /**

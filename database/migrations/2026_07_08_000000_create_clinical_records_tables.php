@@ -62,16 +62,24 @@ return new class extends Migration
 
             $table->string('name');                          // e.g. TLD, Amlodipine
             $table->foreignId('concept_id')->nullable()->constrained()->nullOnDelete();
+            // The stocked product the prescriber chose, when the drug is stocked.
+            $table->foreignId('inventory_item_id')->nullable()->constrained()->nullOnDelete();
             $table->string('dose')->nullable();              // e.g. 5mg
             $table->string('frequency')->nullable();         // e.g. OD, BD
             $table->string('route')->nullable();             // e.g. PO
+            $table->unsignedInteger('quantity')->nullable(); // units to supply
+            $table->unsignedSmallInteger('duration_days')->nullable();
             $table->string('status')->default('active');     // active | stopped | completed
+            // Whether the pharmacy has supplied it: App\Enums\MedicationFulfilment
+            $table->string('fulfilment', 20)->default('pending');
+            $table->unsignedInteger('quantity_dispensed')->default(0);
             $table->date('started_at')->nullable();
             $table->date('stopped_at')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
 
             $table->index(['patient_id', 'status']);
+            $table->index(['patient_id', 'fulfilment']);
         });
 
         // Lab results — investigation results linked to a visit / encounter.

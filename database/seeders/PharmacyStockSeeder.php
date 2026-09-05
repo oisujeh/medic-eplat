@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Enums\InventoryCategory;
 use App\Models\InventoryItem;
+use App\Models\StockLocation;
+use App\Services\StockLocations;
 use Illuminate\Database\Seeder;
 
 class PharmacyStockSeeder extends Seeder
@@ -30,10 +32,19 @@ class PharmacyStockSeeder extends Seeder
     ];
 
     /**
-     * Seed the pharmacy formulary with an opening batch each.
+     * Seed the pharmacy formulary with an opening batch each: most of it in
+     * the main store, a working quantity at the dispensary.
      */
     public function run(): void
     {
+        // call(), not callOnce(): the "once" register is static and would
+        // skip the locations for every test after the first.
+        $this->call(StockLocationsSeeder::class);
+
+        $locations = app(StockLocations::class);
+        $store = $locations->receiving();
+        $dispensary = $locations->dispensary();
+
         foreach ($this->items as [$code, $name, $form, $strength, $unit, $cost, $selling, $reorder, $opening]) {
             $item = InventoryItem::updateOrCreate(
                 ['code' => $code],
@@ -50,17 +61,30 @@ class PharmacyStockSeeder extends Seeder
                 ],
             );
 
-            // Give each item one opening batch (idempotent on re-seed).
+            // Give each item its opening batches (idempotent on re-seed).
             if ($item->batches()->doesntExist()) {
-                $item->batches()->create([
-                    'batch_number' => 'OPEN-'.$item->id,
-                    'expiry_date' => now()->addYear()->toDateString(),
-                    'quantity' => $opening,
-                    'cost_price' => $cost,
-                    'received_at' => now(),
-                ]);
+                $atDispensary = $dispensary->is($store) ? 0 : (int) floor($opening * 0.4);
+
+                $this->openingBatch($item, $store, $opening - $atDispensary, $cost);
+
+                if ($atDispensary > 0) {
+                    $this->openingBatch($item, $dispensary, $atDispensary, $cost);
+                }
+
                 $item->update(['quantity_on_hand' => $opening]);
             }
         }
+    }
+
+    private function openingBatch(InventoryItem $item, StockLocation $location, int $quantity, float $cost): void
+    {
+        $item->batches()->create([
+            'stock_location_id' => $location->id,
+            'batch_number' => 'OPEN-'.$item->id,
+            'expiry_date' => now()->addYear()->toDateString(),
+            'quantity' => $quantity,
+            'cost_price' => $cost,
+            'received_at' => now(),
+        ]);
     }
 }

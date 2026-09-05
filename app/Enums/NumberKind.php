@@ -14,6 +14,7 @@ enum NumberKind: string
     case Pregnancy = 'pregnancy';
     case Claim = 'claim';
     case Referral = 'referral';
+    case Requisition = 'requisition';
 
     public function prefix(): string
     {
@@ -25,6 +26,7 @@ enum NumberKind: string
             self::Pregnancy => 'PRG',
             self::Claim => 'CLM',
             self::Referral => 'REF',
+            self::Requisition => 'REQ',
         };
     }
 
