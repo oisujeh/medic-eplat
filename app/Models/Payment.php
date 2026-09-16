@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $received_by
  * @property Carbon|null $created_at
  */
-#[Fillable(['bill_id', 'amount', 'method', 'reference', 'received_by'])]
+#[Fillable(['bill_id', 'receipt_number', 'amount', 'method', 'reference', 'received_by'])]
 class Payment extends Model implements AuditableRecord
 {
     use Auditable;

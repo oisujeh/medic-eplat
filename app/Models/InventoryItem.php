@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\FundingSource;
 use App\Enums\InventoryCategory;
 use App\Models\Concerns\Auditable;
 use App\Models\Contracts\AuditableRecord;
@@ -19,9 +20,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $code
  * @property string $name
  * @property InventoryCategory $category
+ * @property string|null $generic_name
  * @property string|null $form
  * @property string|null $strength
+ * @property string|null $route
  * @property string $unit
+ * @property int|null $pack_size
+ * @property string|null $brand
+ * @property string|null $nafdac_number
+ * @property FundingSource|null $funding_source
  * @property float|null $cost_price
  * @property float $selling_price
  * @property int $reorder_level
@@ -29,7 +36,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_active
  */
 #[Fillable([
-    'concept_id', 'code', 'name', 'category', 'form', 'strength', 'unit', 'cost_price',
+    'concept_id', 'code', 'name', 'generic_name', 'category', 'form', 'strength', 'route', 'unit',
+    'pack_size', 'brand', 'nafdac_number', 'funding_source', 'cost_price',
     'selling_price', 'reorder_level', 'quantity_on_hand', 'is_active',
 ])]
 class InventoryItem extends Model implements AuditableRecord
@@ -46,6 +54,8 @@ class InventoryItem extends Model implements AuditableRecord
     {
         return [
             'category' => InventoryCategory::class,
+            'funding_source' => FundingSource::class,
+            'pack_size' => 'integer',
             'cost_price' => 'float',
             'selling_price' => 'float',
             'reorder_level' => 'integer',

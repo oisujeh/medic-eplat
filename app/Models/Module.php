@@ -23,6 +23,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 #[Fillable(['name', 'slug', 'description', 'icon', 'href', 'sort_order', 'is_active'])]
 class Module extends Model implements AuditableRecord
 {
+    /**
+     * The modules the facility's billing switch takes out of use.
+     *
+     * @var list<string>
+     */
+    public const BILLING_MODULES = ['billing', 'claims'];
+
     use Auditable;
 
     /**

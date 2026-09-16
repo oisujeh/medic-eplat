@@ -30,8 +30,20 @@ export type FacilityProfile = {
     state: string | null;
     lga: string | null;
     code: string | null;
+    /** primary | secondary | tertiary */
+    level: string | null;
+    /** public | private | faith_based */
+    ownership: string | null;
+    /** phc | secondary | tertiary | private */
+    tier_profile: string | null;
+    /** The DHIS2 organisation unit UID for NHMIS exports. */
+    dhis2_org_unit: string | null;
     /** A notice shown to every member of staff on the home screen. */
     notice: string | null;
+    /** When false no charges post and no prices are shown. */
+    billing_enabled: boolean;
+    patient_number_prefix: string;
+    patient_number_check_digit: boolean;
     completed_at: string | null;
 };
 

@@ -29,6 +29,7 @@ class SetupController extends Controller
 
         return Inertia::render('setup/Wizard', [
             'profile' => $this->facility->profile(),
+            'options' => FacilitySettings::options(),
         ]);
     }
 

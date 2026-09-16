@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     ExternalLink,
@@ -13,6 +13,7 @@ import { computed, ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import type { SharedData } from '@/types';
 import type { StockProduct } from '@/types/clinical';
 
 type Prescription = {
@@ -89,6 +90,11 @@ const settled = computed(() =>
 
 const total = computed(() =>
     lines.value.reduce((sum, l) => sum + l.item.selling_price * l.quantity, 0),
+);
+
+// With billing switched off the facility charges nothing, so no price shows.
+const billingEnabled = computed(
+    () => usePage<SharedData>().props.facility.billing_enabled,
 );
 
 // The lines payload is built via transform(), so its errors aren't on the typed form.
@@ -406,7 +412,9 @@ function toneClass(tone: string): string {
                                 c.label
                             }}</span>
                             <span class="text-xs text-muted-foreground">
-                                {{ money(c.selling_price) }} ·
+                                <template v-if="billingEnabled"
+                                    >{{ money(c.selling_price) }} ·
+                                </template>
                                 {{ c.quantity_on_hand }} {{ c.unit }}
                             </span>
                         </button>
@@ -440,10 +448,14 @@ function toneClass(tone: string): string {
                                 <p
                                     class="truncate text-xs text-muted-foreground"
                                 >
-                                    {{ money(l.item.selling_price) }} each<span
-                                        v-if="l.prescription"
-                                    >
-                                        · for {{ l.prescription }}</span
+                                    <template v-if="billingEnabled"
+                                        >{{
+                                            money(l.item.selling_price)
+                                        }}
+                                        each</template
+                                    ><span v-if="l.prescription">
+                                        {{ billingEnabled ? '· ' : '' }}for
+                                        {{ l.prescription }}</span
                                     >
                                 </p>
                             </div>
@@ -469,6 +481,7 @@ function toneClass(tone: string): string {
                     </p>
 
                     <div
+                        v-if="billingEnabled"
                         class="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm"
                     >
                         <span class="text-muted-foreground">Total</span>
@@ -492,7 +505,7 @@ function toneClass(tone: string): string {
                         @click="dispense"
                     >
                         <Pill class="size-4" />
-                        Dispense &amp; bill
+                        {{ billingEnabled ? 'Dispense & bill' : 'Dispense' }}
                     </Button>
                     <p
                         v-if="linesError"
@@ -519,9 +532,11 @@ function toneClass(tone: string): string {
                                 class="flex items-center justify-between text-xs text-muted-foreground"
                             >
                                 <span>{{ d.at }}</span>
-                                <span class="font-medium text-foreground">{{
-                                    money(d.total)
-                                }}</span>
+                                <span
+                                    v-if="billingEnabled"
+                                    class="font-medium text-foreground"
+                                    >{{ money(d.total) }}</span
+                                >
                             </div>
                             <p
                                 v-for="(it, j) in d.items"

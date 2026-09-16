@@ -56,7 +56,10 @@ const coords = computed(() =>
 
 const linePath = computed(() =>
     coords.value
-        .map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`)
+        .map(
+            (c, i) =>
+                `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`,
+        )
         .join(' '),
 );
 
@@ -108,7 +111,11 @@ function onMove(event: PointerEvent) {
 </script>
 
 <template>
-    <div ref="container" class="relative w-full" @pointerleave="hoverIndex = null">
+    <div
+        ref="container"
+        class="relative w-full"
+        @pointerleave="hoverIndex = null"
+    >
         <svg
             :width="width"
             :height="height"
@@ -186,7 +193,7 @@ function onMove(event: PointerEvent) {
             <span
                 v-for="(g, i) in gridlines"
                 :key="i"
-                class="absolute left-0 -translate-y-1/2 bg-card/70 pr-1 text-[10px] tabular-nums text-muted-foreground"
+                class="absolute left-0 -translate-y-1/2 bg-card/70 pr-1 text-[10px] text-muted-foreground tabular-nums"
                 :style="{ top: `${g.y}px` }"
                 >{{ format(g.value) }}</span
             >

@@ -36,9 +36,16 @@ return new class extends Migration
             $table->string('name');
             $table->foreignId('concept_id')->nullable()->constrained()->nullOnDelete();
             $table->string('category')->default('drug');      // App\Enums\InventoryCategory
+            $table->string('generic_name')->nullable();       // INN, when the name is a brand
             $table->string('form')->nullable();               // Tablet, Capsule, Injection…
             $table->string('strength')->nullable();           // 500mg, 5mg/5ml…
+            $table->string('route', 30)->nullable();          // oral, IV, IM, topical…
             $table->string('unit')->default('each');          // dispensing unit
+            $table->unsignedInteger('pack_size')->nullable(); // units per pack as supplied
+            $table->string('brand')->nullable();
+            $table->string('nafdac_number', 30)->nullable();
+            // The source new batches default to (App\Enums\FundingSource).
+            $table->string('funding_source', 30)->nullable();
             $table->decimal('cost_price', 12, 2)->nullable();
             $table->decimal('selling_price', 12, 2)->default(0);
             $table->unsignedInteger('reorder_level')->default(0);
@@ -58,6 +65,9 @@ return new class extends Migration
             $table->date('expiry_date')->nullable();
             $table->integer('quantity')->default(0);
             $table->decimal('cost_price', 12, 2)->nullable();
+            // Who paid for this batch (App\Enums\FundingSource), so programme
+            // and revolving-fund stock report separately.
+            $table->string('funding_source', 30)->nullable()->index();
             $table->foreignId('received_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('received_at')->nullable();
             $table->timestamps();

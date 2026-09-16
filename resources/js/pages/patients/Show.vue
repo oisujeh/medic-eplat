@@ -10,17 +10,21 @@ import {
     CircleDot,
     History,
     Send,
+    ShieldAlert,
     Stethoscope,
     User,
+    UserCog,
     Waypoints,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import EncounterTimeline from '@/components/encounter/EncounterTimeline.vue';
-import PatientTimeline from '@/components/patients/PatientTimeline.vue';
 import InputError from '@/components/InputError.vue';
 import ObservationChips from '@/components/observations/ObservationChips.vue';
 import ObservationHistory from '@/components/observations/ObservationHistory.vue';
 import ObservationTrends from '@/components/observations/ObservationTrends.vue';
+import PatientTimeline from '@/components/patients/PatientTimeline.vue';
+import type { Relationship } from '@/components/patients/RelationshipsPanel.vue';
+import RelationshipsPanel from '@/components/patients/RelationshipsPanel.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,6 +58,10 @@ type Patient = {
     nin: string | null;
     ward: string | null;
     deceased_at: string | null;
+    status: string;
+    status_label: string;
+    is_restricted: boolean;
+    restricted_reason: string | null;
     mother: { name: string; file_number: string; url: string } | null;
     age: number | null;
     sex: string;
@@ -138,6 +146,8 @@ const props = defineProps<{
         risk_factors: string[];
         url: string;
     } | null;
+    relationships: Relationship[];
+    relationshipTypes: Array<{ value: string; label: string }>;
     canBookPregnancy: boolean;
     canAdmit: boolean;
     canEdit: boolean;
@@ -202,6 +212,30 @@ const currentStage = computed<QueueEntry | null>(() => {
 });
 
 const showRouteForm = ref(false);
+
+// Active, transferred out or lost to follow-up; death comes from the record.
+const showStatusForm = ref(false);
+const statusOptions = [
+    { value: 'active', label: 'Active' },
+    { value: 'transferred_out', label: 'Transferred out' },
+    { value: 'lost_to_follow_up', label: 'Lost to follow-up' },
+];
+const statusForm = useForm({
+    status: props.patient.status,
+    reason: '',
+    transferred_to: '',
+});
+
+function submitStatus() {
+    statusForm.patch(`/patients/${props.patient.id}/status`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showStatusForm.value = false;
+            statusForm.reason = '';
+            statusForm.transferred_to = '';
+        },
+    });
+}
 
 // Jump to the Visit tab and open the routing form (used by shortcuts).
 function startRouting() {
@@ -391,7 +425,11 @@ const visit = computed<Field[]>(() => [
                             props.patient.age !== null
                                 ? ' · ' + props.patient.age + 'y'
                                 : ''
-                        }}{{ props.patient.dob_estimated ? ' (age estimated)' : '' }}
+                        }}{{
+                            props.patient.dob_estimated
+                                ? ' (age estimated)'
+                                : ''
+                        }}
                     </p>
                     <div class="mt-2 flex flex-wrap gap-2">
                         <span
@@ -399,6 +437,20 @@ const visit = computed<Field[]>(() => [
                             class="inline-flex items-center rounded-full bg-foreground px-2 py-0.5 text-xs font-medium text-background"
                         >
                             Deceased · {{ props.patient.deceased_at }}
+                        </span>
+                        <span
+                            v-else-if="props.patient.status !== 'active'"
+                            class="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+                        >
+                            {{ props.patient.status_label }}
+                        </span>
+                        <span
+                            v-if="props.patient.is_restricted"
+                            class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+                            :title="props.patient.restricted_reason ?? ''"
+                        >
+                            <ShieldAlert class="size-3" />
+                            Restricted
                         </span>
                         <span
                             class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
@@ -452,6 +504,17 @@ const visit = computed<Field[]>(() => [
                             <Pencil class="size-4" />
                             Edit
                         </Link>
+                    </Button>
+                    <Button
+                        v-if="
+                            props.canEdit && props.patient.status !== 'deceased'
+                        "
+                        variant="outline"
+                        size="sm"
+                        @click="showStatusForm = !showStatusForm"
+                    >
+                        <UserCog class="size-4" />
+                        Change status
                     </Button>
                     <Button
                         v-if="props.canBook"
@@ -519,6 +582,76 @@ const visit = computed<Field[]>(() => [
                 </div>
             </div>
         </div>
+
+        <!-- Patient status -->
+        <form
+            v-if="showStatusForm"
+            class="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-3"
+            @submit.prevent="submitStatus"
+        >
+            <div class="grid gap-1.5">
+                <Label for="patient-status">Status</Label>
+                <Select v-model="statusForm.status">
+                    <SelectTrigger id="patient-status" class="w-full">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem
+                            v-for="o in statusOptions"
+                            :key="o.value"
+                            :value="o.value"
+                            >{{ o.label }}</SelectItem
+                        >
+                    </SelectContent>
+                </Select>
+                <InputError :message="statusForm.errors.status" />
+            </div>
+            <div
+                v-if="statusForm.status === 'transferred_out'"
+                class="grid gap-1.5"
+            >
+                <Label for="patient-transferred-to">Transferred to</Label>
+                <Input
+                    id="patient-transferred-to"
+                    v-model="statusForm.transferred_to"
+                    placeholder="Receiving facility"
+                />
+                <InputError :message="statusForm.errors.transferred_to" />
+            </div>
+            <div
+                class="grid gap-1.5"
+                :class="
+                    statusForm.status === 'transferred_out'
+                        ? ''
+                        : 'sm:col-span-2'
+                "
+            >
+                <Label for="patient-status-reason">Reason *</Label>
+                <Input
+                    id="patient-status-reason"
+                    v-model="statusForm.reason"
+                    placeholder="Kept with the record and the audit trail"
+                />
+                <InputError :message="statusForm.errors.reason" />
+            </div>
+            <div class="flex items-center gap-2 sm:col-span-3">
+                <Button
+                    type="submit"
+                    size="sm"
+                    :disabled="statusForm.processing"
+                >
+                    Save status
+                </Button>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    @click="showStatusForm = false"
+                >
+                    Cancel
+                </Button>
+            </div>
+        </form>
 
         <!-- Antenatal banner -->
         <div
@@ -643,6 +776,12 @@ const visit = computed<Field[]>(() => [
 
             <!-- ===== OVERVIEW ===== -->
             <TabsContent value="overview" class="flex flex-col gap-6">
+                <RelationshipsPanel
+                    :patient-id="props.patient.id"
+                    :relationships="props.relationships"
+                    :types="props.relationshipTypes"
+                    :can-edit="props.canEdit"
+                />
                 <div class="grid gap-6 lg:grid-cols-3">
                     <div class="flex flex-col gap-6 lg:col-span-2">
                         <!-- Current status -->
@@ -865,7 +1004,10 @@ const visit = computed<Field[]>(() => [
                         </div>
 
                         <div
-                            v-if="!props.openVisit && props.routeOptions.workflows?.length"
+                            v-if="
+                                !props.openVisit &&
+                                props.routeOptions.workflows?.length
+                            "
                             class="grid gap-1.5"
                         >
                             <Label>Pathway</Label>
@@ -882,14 +1024,17 @@ const visit = computed<Field[]>(() => [
                                         }}
                                     </SelectItem>
                                     <SelectItem
-                                        v-for="w in props.routeOptions.workflows"
+                                        v-for="w in props.routeOptions
+                                            .workflows"
                                         :key="w.id"
                                         :value="String(w.id)"
                                         >{{ w.name }}</SelectItem
                                     >
                                 </SelectContent>
                             </Select>
-                            <InputError :message="routeForm.errors.workflow_id" />
+                            <InputError
+                                :message="routeForm.errors.workflow_id"
+                            />
                         </div>
 
                         <div class="grid gap-1.5">

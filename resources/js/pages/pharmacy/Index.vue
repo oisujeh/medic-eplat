@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { Pill } from '@lucide/vue';
+import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
+import type { SharedData } from '@/types';
+
+const billingEnabled = computed(
+    () => usePage<SharedData>().props.facility.billing_enabled,
+);
 
 defineProps<{
     queue: Array<{
@@ -143,7 +149,10 @@ function money(v: number): string {
                             }}</span>
                             <span class="text-xs text-muted-foreground">
                                 {{ d.items_count }} item(s) ·
-                                {{ money(d.total) }} · {{ d.at }}
+                                <template v-if="billingEnabled"
+                                    >{{ money(d.total) }} ·
+                                </template>
+                                {{ d.at }}
                             </span>
                         </li>
                     </ul>

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\EncounterOutcome;
 use App\Enums\EncounterStatus;
+use App\Enums\Permission;
 use App\Enums\Priority;
 use App\Enums\QueueStatus;
 use App\Events\EncounterSigned;
@@ -13,6 +14,7 @@ use App\Models\QueueEntry;
 use App\Models\ServiceCharge;
 use App\Models\ServicePoint;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -50,12 +52,43 @@ class EncounterService
                     'visit_id' => $entry->visit_id,
                     'service_point_id' => $entry->service_point_id,
                     'author_id' => $actor->id,
+                    'entered_by' => $actor->id,
+                    'entered_at' => now(),
+                    'encounter_at' => now(),
                     'type' => $this->workflows->encounterTypeFor($entry),
                     'status' => EncounterStatus::InProgress,
                     'started_at' => now(),
                 ],
             );
         });
+    }
+
+    /**
+     * The clinical date a signed note carries. A date earlier than today is
+     * retrospective entry from paper and needs the backdating permission
+     * (PRD ENC-03); a date in the future is never accepted.
+     *
+     * @throws ValidationException
+     */
+    private function resolveEncounterDate(Encounter $encounter, User $actor, ?CarbonInterface $encounterAt): CarbonInterface
+    {
+        $default = $encounter->encounter_at ?? $encounter->started_at ?? now();
+
+        if ($encounterAt === null) {
+            return $default;
+        }
+
+        if ($encounterAt->isFuture()) {
+            throw ValidationException::withMessages(['encounter_at' => 'The encounter date cannot be in the future.']);
+        }
+
+        $backdated = $encounterAt->toDateString() < now()->toDateString();
+
+        if ($backdated && ! $actor->hasPermission(Permission::BackdateEncounters)) {
+            throw ValidationException::withMessages(['encounter_at' => 'You do not have permission to backdate encounters. Ask a records officer to enter this note.']);
+        }
+
+        return $encounterAt;
     }
 
     /**
@@ -85,6 +118,8 @@ class EncounterService
         Priority $nextPriority = Priority::Normal,
         ?string $nextNote = null,
         ?User $nextAssignedTo = null,
+        ?User $provider = null,
+        ?CarbonInterface $encounterAt = null,
     ): Encounter {
         $encounter->loadMissing('visit', 'servicePoint');
 
@@ -94,10 +129,23 @@ class EncounterService
             ]);
         }
 
-        return DB::transaction(function () use ($encounter, $actor, $narrative, $next, $nextPriority, $nextNote, $nextAssignedTo) {
+        // A clerk entering a paper note names the clinician who saw the
+        // patient; the clerk is recorded separately as the data-entry user.
+        if ($provider !== null && ! $provider->isProvider()) {
+            throw ValidationException::withMessages([
+                'provider_id' => "{$provider->name} is not a clinical cadre and cannot be named as the provider.",
+            ]);
+        }
+
+        $encounterAt = $this->resolveEncounterDate($encounter, $actor, $encounterAt);
+
+        return DB::transaction(function () use ($encounter, $actor, $narrative, $next, $nextPriority, $nextNote, $nextAssignedTo, $provider, $encounterAt) {
             $encounter->fill($this->narrativeOnly($narrative));
             $encounter->fill([
-                'author_id' => $actor->id,
+                'author_id' => $provider?->id ?? $actor->id,
+                'entered_by' => $actor->id,
+                'entered_at' => now(),
+                'encounter_at' => $encounterAt,
                 'status' => EncounterStatus::Signed,
                 'signed_at' => now(),
             ]);

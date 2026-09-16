@@ -32,6 +32,12 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
+
+        // A visit can have more than one payer; each charge names the one
+        // it is claimed from (null: the patient pays out of pocket).
+        Schema::table('bill_charges', function (Blueprint $table) {
+            $table->foreignId('payer_id')->nullable()->after('bill_id')->constrained()->nullOnDelete();
+        });
     }
 
     /**
@@ -39,6 +45,11 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('bill_charges', function (Blueprint $table) {
+            $table->dropForeign(['payer_id']);
+            $table->dropColumn('payer_id');
+        });
+
         Schema::dropIfExists('payers');
     }
 };

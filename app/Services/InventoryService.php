@@ -27,7 +27,10 @@ class InventoryService
      * Receive stock into a new batch, at the given location or wherever
      * deliveries land.
      *
-     * @param  array{batch_number?: string|null, expiry_date?: string|null, cost_price?: float|null}  $attributes
+     * The batch is tagged with who paid for it (PRD STK-02), falling back to
+     * the item's usual source.
+     *
+     * @param  array{batch_number?: string|null, expiry_date?: string|null, cost_price?: float|null, funding_source?: string|null}  $attributes
      */
     public function receiveStock(InventoryItem $item, int $quantity, array $attributes, User $actor, ?StockLocation $location = null): StockBatch
     {
@@ -40,6 +43,7 @@ class InventoryService
                 'expiry_date' => $attributes['expiry_date'] ?? null,
                 'quantity' => $quantity,
                 'cost_price' => $attributes['cost_price'] ?? null,
+                'funding_source' => $attributes['funding_source'] ?? $item->funding_source?->value,
                 'received_by' => $actor->id,
                 'received_at' => now(),
             ]);

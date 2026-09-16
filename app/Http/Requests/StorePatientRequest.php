@@ -31,6 +31,8 @@ class StorePatientRequest extends FormRequest
         $this->merge([
             'is_transfer' => $this->boolean('is_transfer'),
             'dob_estimated' => $this->boolean('dob_estimated'),
+            'sms_consent' => $this->boolean('sms_consent'),
+            'is_restricted' => $this->boolean('is_restricted'),
             'nin' => $nin === '' ? null : IdentifierType::Nin->normalise($nin),
         ]);
     }
@@ -73,7 +75,17 @@ class StorePatientRequest extends FormRequest
                 },
             ],
             'phone' => ['nullable', 'string', 'max:30'],
+            'phone_alternate' => ['nullable', 'string', 'max:30'],
+            'phone_owner' => ['nullable', Rule::in(Patient::PHONE_OWNERS)],
+            'sms_consent' => ['boolean'],
             'email' => ['nullable', 'email', 'max:255'],
+
+            // Retrospective entry keeps the date on the paper register.
+            'registered_at' => ['nullable', 'date', 'before_or_equal:today'],
+
+            // Sensitive cases open only with the break-glass permission or a logged reason.
+            'is_restricted' => ['boolean'],
+            'restricted_reason' => ['nullable', 'required_if:is_restricted,true', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:500'],
             'nationality' => ['required', 'string', 'max:100'],
 
@@ -126,6 +138,7 @@ class StorePatientRequest extends FormRequest
         return [
             'hmo_name.required' => 'Please select the HMO / provider for HMO-covered patients.',
             'transfer_from.required_if' => 'Please enter the facility the patient is transferred from.',
+            'restricted_reason.required_if' => 'Say why the record is restricted so the reason shows to whoever opens it.',
             'outpatient_service.required_if' => 'Please select the outpatient service point.',
         ];
     }

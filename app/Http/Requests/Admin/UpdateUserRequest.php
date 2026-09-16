@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Concerns\ProfileValidationRules;
+use App\Enums\StaffCadre;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -27,6 +28,9 @@ class UpdateUserRequest extends FormRequest
     {
         return [
             ...$this->profileRules($this->targetUser()->id),
+            'cadre' => ['nullable', Rule::enum(StaffCadre::class)],
+            'registration_number' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'max:30'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => [Rule::exists('roles', 'id')],
         ];

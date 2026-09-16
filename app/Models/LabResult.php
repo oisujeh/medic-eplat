@@ -40,8 +40,8 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'lab_order_id', 'lab_test_id', 'catalogue_version_id', 'patient_id', 'visit_id', 'encounter_id',
     'ordered_by', 'resulted_by', 'name', 'code', 'department', 'value', 'unit',
-    'reference_range', 'reference_low', 'reference_high', 'flag', 'specimen',
-    'status', 'resulted_at', 'notes',
+    'reference_range', 'reference_low', 'reference_high', 'critical_low', 'critical_high',
+    'flag', 'specimen', 'status', 'resulted_at', 'notes',
 ])]
 class LabResult extends Model implements AuditableRecord
 {
@@ -78,6 +78,13 @@ class LabResult extends Model implements AuditableRecord
         }
 
         $value = (float) $this->value;
+
+        // A value past a critical limit needs the clinician now, not a
+        // low/high marker on the slip.
+        if (($this->critical_low !== null && $value < (float) $this->critical_low)
+            || ($this->critical_high !== null && $value > (float) $this->critical_high)) {
+            return ResultFlag::Critical;
+        }
 
         if ($this->reference_low !== null && $value < $this->reference_low) {
             return ResultFlag::Low;

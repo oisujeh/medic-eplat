@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\StaffCadre;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
@@ -39,6 +40,7 @@ class UserController extends Controller
 
         return Inertia::render('admin/Users', [
             'users' => $users,
+            'cadres' => StaffCadre::options(),
             'roles' => Role::query()
                 ->orderBy('name')
                 ->get()
@@ -67,6 +69,9 @@ class UserController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'username' => $data['username'],
+            'cadre' => $data['cadre'] ?? null,
+            'registration_number' => $data['registration_number'] ?? null,
+            'phone' => $data['phone'] ?? null,
             'password' => $data['password'],
         ]);
         $user->email_verified_at = now();
@@ -90,6 +95,9 @@ class UserController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'username' => $data['username'],
+            'cadre' => $data['cadre'] ?? null,
+            'registration_number' => $data['registration_number'] ?? null,
+            'phone' => $data['phone'] ?? null,
         ])->save();
 
         $user->roles()->sync($data['roles']);
@@ -168,6 +176,11 @@ class UserController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'username' => $user->username,
+            'cadre' => $user->cadre?->value,
+            'cadre_label' => $user->cadre?->label(),
+            'is_provider' => $user->isProvider(),
+            'registration_number' => $user->registration_number,
+            'phone' => $user->phone,
             'roles' => $user->roles->map(fn (Role $role) => [
                 'id' => $role->id,
                 'name' => $role->name,

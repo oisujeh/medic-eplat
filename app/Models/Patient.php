@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AdmissionStatus;
+use App\Enums\PatientStatus;
 use App\Enums\PregnancyStatus;
 use App\Enums\VisitStatus;
 use App\Models\Concerns\Auditable;
@@ -32,6 +33,17 @@ use Illuminate\Support\Str;
  * @property string $sex
  * @property string|null $marital_status
  * @property string|null $phone
+ * @property string|null $phone_alternate
+ * @property string|null $phone_owner
+ * @property bool $sms_consent
+ * @property Carbon|null $registered_at
+ * @property string|null $phonetic_key
+ * @property PatientStatus $status
+ * @property Carbon|null $status_changed_at
+ * @property string|null $status_reason
+ * @property string|null $transferred_to
+ * @property bool $is_restricted
+ * @property string|null $restricted_reason
  * @property string|null $email
  * @property string|null $address
  * @property string $nationality
@@ -58,17 +70,26 @@ use Illuminate\Support\Str;
  */
 #[Fillable([
     'title', 'surname', 'first_name', 'other_names', 'date_of_birth', 'dob_estimated', 'sex',
-    'marital_status', 'nin', 'phone', 'email', 'address', 'nationality', 'state', 'lga', 'ward',
+    'marital_status', 'nin', 'phone', 'phone_alternate', 'phone_owner', 'sms_consent',
+    'email', 'address', 'nationality', 'state', 'lga', 'ward',
     'mother_patient_id',
     'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
     'coverage', 'hmo_name', 'payer_id', 'hmo_number', 'hmo_plan', 'hmo_expires_at',
     'is_transfer', 'transfer_from', 'transfer_reason', 'transfer_service',
-    'visit_category', 'outpatient_service', 'registered_by',
+    'visit_category', 'outpatient_service', 'registered_by', 'registered_at',
+    'is_restricted', 'restricted_reason',
 ])]
 class Patient extends Model implements AuditableRecord
 {
     /** @use HasFactory<PatientFactory> */
     use Auditable, HasFactory, HasPublicId;
+
+    /**
+     * Whose phone the primary number is.
+     *
+     * @var list<string>
+     */
+    public const PHONE_OWNERS = ['self', 'spouse', 'parent', 'child', 'relative', 'other'];
 
     /**
      * Get the attributes that should be cast.
@@ -80,10 +101,65 @@ class Patient extends Model implements AuditableRecord
         return [
             'date_of_birth' => 'date',
             'dob_estimated' => 'boolean',
+            'sms_consent' => 'boolean',
             'hmo_expires_at' => 'date',
             'is_transfer' => 'boolean',
+            'registered_at' => 'datetime',
+            'status' => PatientStatus::class,
+            'status_changed_at' => 'datetime',
+            'is_restricted' => 'boolean',
             'merged_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Move the patient to a new status, dating the change and recording why.
+     * Death is set by the death register, not here.
+     */
+    public function changeStatus(PatientStatus $status, ?string $reason = null, ?string $transferredTo = null): void
+    {
+        if ($this->status === $status) {
+            return;
+        }
+
+        $this->forceFill([
+            'status' => $status,
+            'status_changed_at' => now(),
+            'status_reason' => $reason,
+            'transferred_to' => $status === PatientStatus::TransferredOut ? $transferredTo : null,
+        ])->save();
+    }
+
+    /**
+     * Whether opening this record needs the break-glass permission or a
+     * logged reason.
+     */
+    public function isRestricted(): bool
+    {
+        return $this->is_restricted;
+    }
+
+    /**
+     * The key search uses to find a name by how it sounds.
+     */
+    public static function phoneticKeyFor(?string $surname, ?string $firstName): ?string
+    {
+        $parts = array_filter([
+            metaphone(preg_replace('/[^a-z]/i', '', (string) $surname) ?? ''),
+            metaphone(preg_replace('/[^a-z]/i', '', (string) $firstName) ?? ''),
+        ]);
+
+        return $parts === [] ? null : mb_substr(implode('-', $parts), 0, 60);
+    }
+
+    /**
+     * Other patients this one is linked to: mother, child, household, contact.
+     *
+     * @return HasMany<PatientRelationship, $this>
+     */
+    public function relationships(): HasMany
+    {
+        return $this->hasMany(PatientRelationship::class);
     }
 
     /**
@@ -118,6 +194,11 @@ class Patient extends Model implements AuditableRecord
      */
     protected static function booted(): void
     {
+        static::saving(function (Patient $patient) {
+            $patient->phonetic_key = self::phoneticKeyFor($patient->surname, $patient->first_name);
+            $patient->registered_at ??= Carbon::now();
+        });
+
         static::saved(fn (Patient $patient) => app(PatientIdentifiers::class)->sync($patient));
     }
 
@@ -218,6 +299,16 @@ class Patient extends Model implements AuditableRecord
     public function encounters(): HasMany
     {
         return $this->hasMany(Encounter::class)->latest('started_at')->latest('id');
+    }
+
+    /**
+     * The clinical forms filled for the patient, newest first.
+     *
+     * @return HasMany<FormSubmission, $this>
+     */
+    public function formSubmissions(): HasMany
+    {
+        return $this->hasMany(FormSubmission::class)->latest('started_at')->latest('id');
     }
 
     /**

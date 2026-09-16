@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $chapter
  * @property bool $is_active
  */
-#[Fillable(['code', 'description', 'chapter', 'is_active'])]
+#[Fillable(['code', 'description', 'chapter', 'icd11_code', 'is_active'])]
 class IcdCode extends Model implements AuditableRecord
 {
     /** @use HasFactory<IcdCodeFactory> */

@@ -45,6 +45,9 @@ return new class extends Migration
             $table->foreignId('patient_id')->constrained()->cascadeOnDelete();
 
             $table->string('code', 40);                            // ObservationCode
+            // The dictionary concept the reading is an observation of, so
+            // every reading is queryable by concept as well as by code.
+            $table->foreignId('concept_id')->nullable()->constrained()->nullOnDelete();
             $table->decimal('value', 8, 2)->nullable();            // numeric reading
             $table->string('text_value')->nullable();              // categorical reading, e.g. presentation
             $table->string('unit', 20)->nullable();

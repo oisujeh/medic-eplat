@@ -5,12 +5,15 @@ import {
     Check,
     ChevronLeft,
     ChevronRight,
+    Hash,
+    Layers,
     MapPin,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import FacilityProfileFields from '@/components/facility/FacilityProfileFields.vue';
 import type { FacilityProfileForm } from '@/components/facility/FacilityProfileFields.vue';
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -19,34 +22,68 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { logout } from '@/routes';
 import { store } from '@/routes/setup';
 import type { FacilityProfile, SharedData } from '@/types';
 
+type Option = { value: string; label: string };
+
 const props = defineProps<{
     profile: FacilityProfile;
+    options: { levels: Option[]; ownerships: Option[]; tierProfiles: Option[] };
 }>();
 
 const page = usePage<SharedData>();
 const adminName = computed(() => page.props.auth.user?.name ?? '');
 
-const form = useForm<FacilityProfileForm>({
+type WizardForm = FacilityProfileForm & {
+    level: string;
+    ownership: string;
+    tier_profile: string;
+    patient_number_prefix: string;
+    patient_number_check_digit: boolean;
+    billing_enabled: boolean;
+};
+
+const form = useForm<WizardForm>({
     name: props.profile.name ?? '',
     code: props.profile.code ?? '',
     state: props.profile.state ?? '',
     lga: props.profile.lga ?? '',
+    level: props.profile.level ?? '',
+    ownership: props.profile.ownership ?? '',
+    tier_profile: props.profile.tier_profile ?? '',
+    patient_number_prefix: props.profile.patient_number_prefix ?? 'MEP',
+    patient_number_check_digit: props.profile.patient_number_check_digit,
+    billing_enabled: props.profile.billing_enabled,
 });
 
-type StepKey = 'identity' | 'location' | 'review';
+type StepKey = 'identity' | 'location' | 'profile' | 'numbering' | 'review';
+type TextField = Exclude<
+    keyof WizardForm,
+    'patient_number_check_digit' | 'billing_enabled'
+>;
 
-const steps: Array<{
-    key: StepKey;
-    title: string;
-    fields: Array<keyof FacilityProfileForm>;
-}> = [
+const steps: Array<{ key: StepKey; title: string; fields: TextField[] }> = [
     { key: 'identity', title: 'Facility', fields: ['name', 'code'] },
     { key: 'location', title: 'Location', fields: ['state', 'lga'] },
+    {
+        key: 'profile',
+        title: 'Profile',
+        fields: ['level', 'ownership', 'tier_profile'],
+    },
+    { key: 'numbering', title: 'Numbering', fields: ['patient_number_prefix'] },
     { key: 'review', title: 'Review', fields: [] },
 ];
 
@@ -54,9 +91,11 @@ const current = ref(0);
 const step = computed(() => steps[current.value]);
 const isLast = computed(() => current.value === steps.length - 1);
 
-// The review step shows a summary instead of fields.
+// The shared fields component shows one group at a time on the first two steps.
 const fieldSection = computed(() =>
-    step.value.key === 'review' ? undefined : step.value.key,
+    step.value.key === 'identity' || step.value.key === 'location'
+        ? step.value.key
+        : undefined,
 );
 
 // Each step's fields must be filled before moving on; the server validates
@@ -96,11 +135,59 @@ function submit() {
     });
 }
 
+function labelFor(options: Option[], value: string): string {
+    return options.find((o) => o.value === value)?.label ?? value;
+}
+
+// The same Luhn digit the server appends, so the preview is exact.
+function luhn(digits: string): number {
+    let sum = 0;
+    let double = true;
+
+    for (let i = digits.length - 1; i >= 0; i--) {
+        let digit = Number(digits[i]);
+
+        if (double) {
+            digit *= 2;
+            digit = digit > 9 ? digit - 9 : digit;
+        }
+
+        sum += digit;
+        double = !double;
+    }
+
+    return (10 - (sum % 10)) % 10;
+}
+
+const sampleNumber = computed(() => {
+    const prefix = (form.patient_number_prefix || 'MEP').toUpperCase();
+    const year = new Date().getFullYear();
+    const check = form.patient_number_check_digit
+        ? `-${luhn(`${year}000001`)}`
+        : '';
+
+    return `${prefix}/${year}/000001${check}`;
+});
+
 const summary = computed(() => [
     { label: 'Facility name', value: form.name },
     { label: 'Facility code', value: form.code, mono: true },
     { label: 'State', value: form.state },
     { label: 'LGA', value: form.lga },
+    {
+        label: 'Level of care',
+        value: labelFor(props.options.levels, form.level),
+    },
+    {
+        label: 'Ownership',
+        value: labelFor(props.options.ownerships, form.ownership),
+    },
+    {
+        label: 'Profile',
+        value: labelFor(props.options.tierProfiles, form.tier_profile),
+    },
+    { label: 'File numbers', value: sampleNumber.value, mono: true },
+    { label: 'Billing', value: form.billing_enabled ? 'On' : 'Off' },
 ]);
 </script>
 
@@ -179,6 +266,7 @@ const summary = computed(() => [
                                 <template v-else>{{ i + 1 }}</template>
                             </span>
                             <span
+                                class="hidden sm:inline"
                                 :class="
                                     i === current
                                         ? 'font-medium'
@@ -223,6 +311,32 @@ const summary = computed(() => [
                                     facility is located in.
                                 </CardDescription>
                             </template>
+                            <template v-else-if="step.key === 'profile'">
+                                <CardTitle class="flex items-center gap-2">
+                                    <Layers
+                                        class="size-4 text-muted-foreground"
+                                    />
+                                    What kind of facility
+                                </CardTitle>
+                                <CardDescription>
+                                    The level of care, who owns it, and the
+                                    configuration profile that decides which
+                                    modules, forms and reports are on.
+                                </CardDescription>
+                            </template>
+                            <template v-else-if="step.key === 'numbering'">
+                                <CardTitle class="flex items-center gap-2">
+                                    <Hash
+                                        class="size-4 text-muted-foreground"
+                                    />
+                                    File numbers and billing
+                                </CardTitle>
+                                <CardDescription>
+                                    How hospital numbers print on cards and
+                                    folders, and whether the facility charges
+                                    for care.
+                                </CardDescription>
+                            </template>
                             <template v-else>
                                 <CardTitle class="flex items-center gap-2">
                                     <Check
@@ -239,7 +353,7 @@ const summary = computed(() => [
 
                         <CardContent>
                             <FacilityProfileFields
-                                v-if="step.key !== 'review'"
+                                v-if="fieldSection"
                                 v-model:name="form.name"
                                 v-model:code="form.code"
                                 v-model:state="form.state"
@@ -247,6 +361,165 @@ const summary = computed(() => [
                                 :errors="form.errors"
                                 :section="fieldSection"
                             />
+
+                            <div
+                                v-else-if="step.key === 'profile'"
+                                class="grid gap-5"
+                            >
+                                <div class="grid gap-1.5">
+                                    <Label for="setup-level"
+                                        >Level of care *</Label
+                                    >
+                                    <Select v-model="form.level">
+                                        <SelectTrigger
+                                            id="setup-level"
+                                            class="w-full"
+                                        >
+                                            <SelectValue
+                                                placeholder="Select level"
+                                            />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem
+                                                v-for="o in options.levels"
+                                                :key="o.value"
+                                                :value="o.value"
+                                                >{{ o.label }}</SelectItem
+                                            >
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError :message="form.errors.level" />
+                                </div>
+                                <div class="grid gap-1.5">
+                                    <Label for="setup-ownership"
+                                        >Ownership *</Label
+                                    >
+                                    <Select v-model="form.ownership">
+                                        <SelectTrigger
+                                            id="setup-ownership"
+                                            class="w-full"
+                                        >
+                                            <SelectValue
+                                                placeholder="Select ownership"
+                                            />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem
+                                                v-for="o in options.ownerships"
+                                                :key="o.value"
+                                                :value="o.value"
+                                                >{{ o.label }}</SelectItem
+                                            >
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError
+                                        :message="form.errors.ownership"
+                                    />
+                                </div>
+                                <div class="grid gap-1.5">
+                                    <Label for="setup-tier"
+                                        >Configuration profile *</Label
+                                    >
+                                    <Select v-model="form.tier_profile">
+                                        <SelectTrigger
+                                            id="setup-tier"
+                                            class="w-full"
+                                        >
+                                            <SelectValue
+                                                placeholder="Select profile"
+                                            />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem
+                                                v-for="o in options.tierProfiles"
+                                                :key="o.value"
+                                                :value="o.value"
+                                                >{{ o.label }}</SelectItem
+                                            >
+                                        </SelectContent>
+                                    </Select>
+                                    <p class="text-xs text-muted-foreground">
+                                        PHC, secondary, tertiary or private. The
+                                        same software runs everywhere; the
+                                        profile switches modules on and off.
+                                    </p>
+                                    <InputError
+                                        :message="form.errors.tier_profile"
+                                    />
+                                </div>
+                            </div>
+
+                            <div
+                                v-else-if="step.key === 'numbering'"
+                                class="grid gap-5"
+                            >
+                                <div class="grid gap-1.5">
+                                    <Label for="setup-prefix"
+                                        >File number prefix *</Label
+                                    >
+                                    <Input
+                                        id="setup-prefix"
+                                        v-model="form.patient_number_prefix"
+                                        class="font-mono uppercase"
+                                        maxlength="6"
+                                        autocomplete="off"
+                                    />
+                                    <p class="text-xs text-muted-foreground">
+                                        Numbers will print as
+                                        <span class="font-mono">{{
+                                            sampleNumber
+                                        }}</span
+                                        >. Up to six letters or digits.
+                                    </p>
+                                    <InputError
+                                        :message="
+                                            form.errors.patient_number_prefix
+                                        "
+                                    />
+                                </div>
+                                <label class="flex items-start gap-2 text-sm">
+                                    <Checkbox
+                                        :model-value="
+                                            form.patient_number_check_digit
+                                        "
+                                        @update:model-value="
+                                            (v) =>
+                                                (form.patient_number_check_digit =
+                                                    v === true)
+                                        "
+                                    />
+                                    <span>
+                                        Add a check digit
+                                        <span
+                                            class="block text-xs text-muted-foreground"
+                                        >
+                                            Catches a mistyped or misread file
+                                            number at the desk.
+                                        </span>
+                                    </span>
+                                </label>
+                                <label class="flex items-start gap-2 text-sm">
+                                    <Checkbox
+                                        :model-value="form.billing_enabled"
+                                        @update:model-value="
+                                            (v) =>
+                                                (form.billing_enabled =
+                                                    v === true)
+                                        "
+                                    />
+                                    <span>
+                                        This facility bills for care
+                                        <span
+                                            class="block text-xs text-muted-foreground"
+                                        >
+                                            Off for facilities where care is
+                                            free: no charges post and no prices
+                                            show. Can be changed later.
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+
                             <dl
                                 v-else
                                 class="divide-y divide-border rounded-lg border border-border"

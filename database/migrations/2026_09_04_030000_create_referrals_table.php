@@ -20,10 +20,19 @@ return new class extends Migration
             $table->string('referral_number', 20)->unique();
             $table->foreignId('patient_id')->constrained()->restrictOnDelete();
             $table->foreignId('encounter_id')->nullable()->constrained()->nullOnDelete();
+            // The visit a referral in opened, or an internal referral moved.
+            $table->foreignId('visit_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('referred_by')->nullable()->constrained('users')->nullOnDelete();
 
+            // Which way it travels (App\Enums\ReferralDirection). A referral
+            // in carries where it came from; a referral out where it goes.
+            $table->string('direction', 10)->default('outbound')->index();
+            $table->string('source_facility', 150)->nullable();
+            $table->string('source_contact', 150)->nullable();
+            $table->timestamp('received_at')->nullable();
+
             $table->string('urgency', 20)->index();
-            $table->string('destination_facility', 150);
+            $table->string('destination_facility', 150)->nullable();
             $table->string('destination_department', 100)->nullable();
             $table->string('destination_contact', 150)->nullable();
 

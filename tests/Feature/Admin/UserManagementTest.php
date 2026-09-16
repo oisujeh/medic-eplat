@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\StaffCadre;
 use App\Models\Patient;
 use App\Models\Role;
 use App\Models\User;
@@ -121,6 +122,66 @@ test('an administrator can create a user and assign roles', function () {
     expect($created->username)->toBe('a.obi');
     expect(Hash::check('Str0ng-Passw0rd!', $created->password))->toBeTrue();
     expect($created->roles->pluck('slug')->sort()->values()->all())->toBe(['nurse', 'physician']);
+});
+
+test('an account carries cadre, registration number and phone', function () {
+    $admin = staffWithRoles(['super-administrator']);
+
+    $this->actingAs($admin)
+        ->post(route('admin.users.store'), [
+            'name' => 'Dr Amaka Obi',
+            'username' => 'a.obi',
+            'email' => 'a.obi@facility.test',
+            'cadre' => 'doctor',
+            'registration_number' => 'MDCN/12345',
+            'phone' => '08031234567',
+            'password' => 'Str0ng-Passw0rd!',
+            'password_confirmation' => 'Str0ng-Passw0rd!',
+            'roles' => [roleId('physician')],
+        ])
+        ->assertSessionHasNoErrors();
+
+    $created = User::where('email', 'a.obi@facility.test')->firstOrFail();
+
+    expect($created->cadre)->toBe(StaffCadre::Doctor)
+        ->and($created->registration_number)->toBe('MDCN/12345')
+        ->and($created->phone)->toBe('08031234567')
+        ->and($created->isProvider())->toBeTrue();
+
+    $this->actingAs($admin)
+        ->patch(route('admin.users.update', $created), [
+            'name' => $created->name,
+            'username' => $created->username,
+            'email' => $created->email,
+            'cadre' => 'data_clerk',
+            'roles' => [roleId('records-officer')],
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($created->fresh()->isProvider())->toBeFalse();
+});
+
+test('an unknown cadre is rejected', function () {
+    $admin = staffWithRoles(['super-administrator']);
+
+    $this->actingAs($admin)
+        ->post(route('admin.users.store'), [
+            'name' => 'Ghost',
+            'username' => 'ghost',
+            'email' => 'ghost@facility.test',
+            'cadre' => 'wizard',
+            'password' => 'Str0ng-Passw0rd!',
+            'password_confirmation' => 'Str0ng-Passw0rd!',
+            'roles' => [roleId('nurse')],
+        ])
+        ->assertSessionHasErrors('cadre');
+});
+
+test('only clinical cadres are providers', function () {
+    expect(User::factory()->clinician(StaffCadre::Nurse)->create()->isProvider())->toBeTrue()
+        ->and(User::factory()->create(['cadre' => StaffCadre::Cashier])->isProvider())->toBeFalse()
+        ->and(User::factory()->create()->isProvider())->toBeFalse()
+        ->and(User::providers()->count())->toBe(1);
 });
 
 test('a created account can sign in and reach its modules immediately', function () {

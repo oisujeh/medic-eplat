@@ -85,7 +85,9 @@ const describe = (p: Summary) =>
                 Pairs of records that may be the same person. Open a pair to
                 compare them side by side, then merge them or mark them as
                 different people.
-                {{ props.canMerge ? '' : 'Merging needs the merge permission.' }}
+                {{
+                    props.canMerge ? '' : 'Merging needs the merge permission.'
+                }}
             </p>
         </div>
 
@@ -105,7 +107,13 @@ const describe = (p: Summary) =>
             >
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex items-center gap-2">
-                        <Badge :variant="row.level === 'auto' ? 'destructive' : 'secondary'">
+                        <Badge
+                            :variant="
+                                row.level === 'auto'
+                                    ? 'destructive'
+                                    : 'secondary'
+                            "
+                        >
                             {{ row.level_label }}
                         </Badge>
                         <span class="font-mono text-xs text-muted-foreground"

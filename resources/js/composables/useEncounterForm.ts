@@ -123,6 +123,10 @@ export type EncounterFormData = {
     next_assigned_to: string;
     next_priority: string;
     next_note: string;
+    /** The clinician the note is attributed to; 'self' when the signer saw the patient. */
+    provider_id: string;
+    /** The clinical date, when the note is entered later than the contact. */
+    encounter_at: string;
 };
 
 type Loose = Record<string, unknown> | null | undefined;
@@ -228,6 +232,8 @@ export function provideEncounterForm(
         next_assigned_to: 'none',
         next_priority: 'normal',
         next_note: '',
+        provider_id: 'self',
+        encounter_at: '',
     });
 
     const readOnly = computed(() => !encounter.is_open || !canDocument);
@@ -276,6 +282,9 @@ export function provideEncounterForm(
                     : Number(data.next_assigned_to),
             next_priority: data.next_priority,
             next_note: data.next_note,
+            provider_id:
+                data.provider_id === 'self' ? null : Number(data.provider_id),
+            encounter_at: data.encounter_at || null,
         })).post(encounter.urls.sign, {
             preserveScroll: true,
             onFinish: () => form.transform((d) => d),

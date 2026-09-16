@@ -33,6 +33,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import type { SharedData } from '@/types';
 import type {
     ObservationCodeDefinition,
     ObservationSet,
@@ -133,6 +134,8 @@ defineOptions({
 // Guard failures from the service (wrong status, bed taken meanwhile) come
 // back under a key that is not a form field.
 const page = usePage();
+// With billing switched off there is no bill to show.
+const billingEnabled = usePage<SharedData>().props.facility.billing_enabled;
 const serviceError = computed(
     () => (page.props.errors as Record<string, string> | undefined)?.status,
 );
@@ -557,7 +560,10 @@ const details = computed(() => [
 
             <aside class="flex flex-col gap-6">
                 <!-- Bill -->
-                <section class="rounded-xl border border-border bg-card p-5">
+                <section
+                    v-if="billingEnabled"
+                    class="rounded-xl border border-border bg-card p-5"
+                >
                     <h2
                         class="mb-3 flex items-center gap-2 text-sm font-semibold"
                     >

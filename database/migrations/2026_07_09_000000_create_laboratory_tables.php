@@ -37,6 +37,24 @@ return new class extends Migration
             $table->index(['department', 'is_active']);
         });
 
+        // Reference and critical limits by age band and sex. A test with no
+        // rows here falls back to its single facility-wide range.
+        Schema::create('lab_reference_ranges', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('lab_test_id')->constrained()->cascadeOnDelete();
+            $table->string('sex', 1)->nullable();             // F | M | null for both
+            $table->unsignedInteger('age_min_days')->default(0);
+            $table->unsignedInteger('age_max_days')->nullable(); // null: no upper bound
+            $table->decimal('low', 12, 3)->nullable();
+            $table->decimal('high', 12, 3)->nullable();
+            $table->decimal('critical_low', 12, 3)->nullable();
+            $table->decimal('critical_high', 12, 3)->nullable();
+            $table->string('text')->nullable();               // qualitative reference
+            $table->timestamps();
+
+            $table->index(['lab_test_id', 'sex', 'age_min_days']);
+        });
+
         // Which analytes make up a panel (self-referential many-to-many on lab_tests).
         Schema::create('lab_panel_items', function (Blueprint $table) {
             $table->id();
@@ -88,6 +106,8 @@ return new class extends Migration
             $table->string('department')->nullable()->after('code');
             $table->decimal('reference_low', 12, 3)->nullable()->after('reference_range');
             $table->decimal('reference_high', 12, 3)->nullable()->after('reference_low');
+            $table->decimal('critical_low', 12, 3)->nullable()->after('reference_high');
+            $table->decimal('critical_high', 12, 3)->nullable()->after('critical_low');
 
             $table->index('lab_order_id');
         });
@@ -101,11 +121,12 @@ return new class extends Migration
         Schema::table('lab_results', function (Blueprint $table) {
             $table->dropForeign(['lab_order_id']);
             $table->dropForeign(['lab_test_id']);
-            $table->dropColumn(['lab_order_id', 'lab_test_id', 'department', 'reference_low', 'reference_high']);
+            $table->dropColumn(['lab_order_id', 'lab_test_id', 'department', 'reference_low', 'reference_high', 'critical_low', 'critical_high']);
         });
 
         Schema::dropIfExists('lab_orders');
         Schema::dropIfExists('lab_panel_items');
+        Schema::dropIfExists('lab_reference_ranges');
         Schema::dropIfExists('lab_tests');
     }
 };

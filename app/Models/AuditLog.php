@@ -51,6 +51,9 @@ class AuditLog extends Model
 
     public const ACTION_MERGED = 'merged';
 
+    /** A restricted record opened on a logged reason rather than a permission. */
+    public const ACTION_BREAK_GLASS = 'break_glass';
+
     /**
      * Every action the trail records, in display order.
      *
@@ -58,6 +61,7 @@ class AuditLog extends Model
      */
     public const ACTIONS = [
         self::ACTION_VIEWED,
+        self::ACTION_BREAK_GLASS,
         self::ACTION_CREATED,
         self::ACTION_UPDATED,
         self::ACTION_DELETED,

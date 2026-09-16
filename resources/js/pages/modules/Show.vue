@@ -20,7 +20,9 @@ defineOptions({
 <template>
     <Head :title="module.name" />
 
-    <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+    <div
+        class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4"
+    >
         <div class="flex flex-col gap-1">
             <h1 class="text-2xl font-semibold tracking-tight">
                 {{ module.name }}

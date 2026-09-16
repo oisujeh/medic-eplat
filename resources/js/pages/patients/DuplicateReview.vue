@@ -129,10 +129,14 @@ const dismissForm = useForm({ notes: '' });
 const confirming = ref(false);
 
 const survivor = computed(
-    () => props.records.find((r) => r.id === mergeForm.survivor_id) ?? props.records[0],
+    () =>
+        props.records.find((r) => r.id === mergeForm.survivor_id) ??
+        props.records[0],
 );
 const duplicate = computed(
-    () => props.records.find((r) => r.id !== mergeForm.survivor_id) ?? props.records[1],
+    () =>
+        props.records.find((r) => r.id !== mergeForm.survivor_id) ??
+        props.records[1],
 );
 
 function submitMerge() {
@@ -165,11 +169,21 @@ function submitDismiss() {
                 <h1 class="text-2xl font-semibold tracking-tight">
                     Are these the same person?
                 </h1>
-                <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <Badge :variant="props.candidate.level === 'auto' ? 'destructive' : 'secondary'">
+                <p
+                    class="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+                >
+                    <Badge
+                        :variant="
+                            props.candidate.level === 'auto'
+                                ? 'destructive'
+                                : 'secondary'
+                        "
+                    >
                         {{ props.candidate.level_label }}
                     </Badge>
-                    <span class="font-mono text-xs">score {{ props.candidate.score }}</span>
+                    <span class="font-mono text-xs"
+                        >score {{ props.candidate.score }}</span
+                    >
                     <span>· {{ props.candidate.reasons.join(' · ') }}</span>
                 </p>
             </div>
@@ -177,11 +191,20 @@ function submitDismiss() {
                 v-if="!pending"
                 class="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
             >
-                <span class="font-medium">{{ props.candidate.status_label }}</span>
-                <span v-if="props.candidate.reviewed_by" class="text-muted-foreground">
-                    · {{ props.candidate.reviewed_by }}, {{ props.candidate.reviewed_at }}
+                <span class="font-medium">{{
+                    props.candidate.status_label
+                }}</span>
+                <span
+                    v-if="props.candidate.reviewed_by"
+                    class="text-muted-foreground"
+                >
+                    · {{ props.candidate.reviewed_by }},
+                    {{ props.candidate.reviewed_at }}
                 </span>
-                <div v-if="props.candidate.notes" class="text-xs text-muted-foreground">
+                <div
+                    v-if="props.candidate.notes"
+                    class="text-xs text-muted-foreground"
+                >
                     {{ props.candidate.notes }}
                 </div>
             </div>
@@ -191,18 +214,28 @@ function submitDismiss() {
         <div class="overflow-x-auto rounded-xl border border-border bg-card">
             <table class="w-full text-sm">
                 <thead>
-                    <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                    <tr
+                        class="border-b border-border text-left text-xs text-muted-foreground"
+                    >
                         <th class="px-4 py-3 font-medium">Field</th>
                         <th
                             v-for="r in props.records"
                             :key="r.id"
                             class="px-4 py-3 font-medium"
                         >
-                            <Link :href="r.url" target="_blank" class="text-foreground hover:underline">
+                            <Link
+                                :href="r.url"
+                                target="_blank"
+                                class="text-foreground hover:underline"
+                            >
                                 {{ r.name }}
                             </Link>
                             <span
-                                v-if="pending && props.canMerge && r.id === mergeForm.survivor_id"
+                                v-if="
+                                    pending &&
+                                    props.canMerge &&
+                                    r.id === mergeForm.survivor_id
+                                "
                                 class="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
                                 >Keeping this one</span
                             >
@@ -211,20 +244,36 @@ function submitDismiss() {
                 </thead>
                 <tbody class="divide-y divide-border">
                     <tr v-for="f in fields" :key="f.key">
-                        <td class="px-4 py-2 text-muted-foreground">{{ f.label }}</td>
+                        <td class="px-4 py-2 text-muted-foreground">
+                            {{ f.label }}
+                        </td>
                         <td
                             v-for="r in props.records"
                             :key="r.id"
                             class="px-4 py-2"
-                            :class="differs(f.key) ? 'font-medium' : 'text-muted-foreground'"
+                            :class="
+                                differs(f.key)
+                                    ? 'font-medium'
+                                    : 'text-muted-foreground'
+                            "
                         >
                             {{ display(r, f.key) }}
                         </td>
                     </tr>
                     <tr>
-                        <td class="px-4 py-2 text-muted-foreground">Other identifiers</td>
-                        <td v-for="r in props.records" :key="r.id" class="px-4 py-2">
-                            {{ r.identifiers.length ? r.identifiers.join(', ') : '—' }}
+                        <td class="px-4 py-2 text-muted-foreground">
+                            Other identifiers
+                        </td>
+                        <td
+                            v-for="r in props.records"
+                            :key="r.id"
+                            class="px-4 py-2"
+                        >
+                            {{
+                                r.identifiers.length
+                                    ? r.identifiers.join(', ')
+                                    : '—'
+                            }}
                         </td>
                     </tr>
                     <tr
@@ -232,7 +281,9 @@ function submitDismiss() {
                         :key="key"
                         class="bg-muted/20"
                     >
-                        <td class="px-4 py-2 text-muted-foreground">{{ label }}</td>
+                        <td class="px-4 py-2 text-muted-foreground">
+                            {{ label }}
+                        </td>
                         <td
                             v-for="r in props.records"
                             :key="r.id"
@@ -268,7 +319,11 @@ function submitDismiss() {
                         v-for="r in props.records"
                         :key="r.id"
                         class="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm"
-                        :class="mergeForm.survivor_id === r.id ? 'border-primary bg-primary/5' : ''"
+                        :class="
+                            mergeForm.survivor_id === r.id
+                                ? 'border-primary bg-primary/5'
+                                : ''
+                        "
                     >
                         <input
                             v-model="mergeForm.survivor_id"
@@ -279,8 +334,13 @@ function submitDismiss() {
                         />
                         <span>
                             <span class="font-medium">{{ r.name }}</span>
-                            <span class="ml-1 font-mono text-xs text-muted-foreground">{{ r.file_number }}</span>
-                            <span class="ml-1 text-xs text-muted-foreground">· {{ total(r) }} records</span>
+                            <span
+                                class="ml-1 font-mono text-xs text-muted-foreground"
+                                >{{ r.file_number }}</span
+                            >
+                            <span class="ml-1 text-xs text-muted-foreground"
+                                >· {{ total(r) }} records</span
+                            >
                         </span>
                     </label>
                     <InputError :message="mergeForm.errors.survivor_id" />
@@ -300,7 +360,8 @@ function submitDismiss() {
                 <div v-if="!confirming">
                     <Button type="button" @click="confirming = true">
                         <GitMerge class="size-4" />
-                        Merge {{ duplicate.file_number }} into {{ survivor.file_number }}
+                        Merge {{ duplicate.file_number }} into
+                        {{ survivor.file_number }}
                     </Button>
                 </div>
                 <div
@@ -308,8 +369,11 @@ function submitDismiss() {
                     class="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm"
                 >
                     <span class="mr-auto">
-                        Merge <strong>{{ duplicate.name }}</strong> ({{ duplicate.file_number }})
-                        into <strong>{{ survivor.name }}</strong> ({{ survivor.file_number }})?
+                        Merge <strong>{{ duplicate.name }}</strong> ({{
+                            duplicate.file_number
+                        }}) into <strong>{{ survivor.name }}</strong> ({{
+                            survivor.file_number
+                        }})?
                     </span>
                     <Button
                         type="button"
@@ -334,14 +398,16 @@ function submitDismiss() {
                 </div>
             </section>
 
-            <section class="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
+            <section
+                class="flex flex-col gap-4 rounded-xl border border-border bg-card p-5"
+            >
                 <h2 class="flex items-center gap-2 text-sm font-semibold">
                     <X class="size-4" />
                     Different people
                 </h2>
                 <p class="text-xs text-muted-foreground">
-                    Take the pair off the queue. Editing either record later will
-                    not bring it back.
+                    Take the pair off the queue. Editing either record later
+                    will not bring it back.
                 </p>
                 <div class="grid gap-1.5">
                     <Label for="dismiss-notes">Note</Label>

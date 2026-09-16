@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\AppointmentSource;
 use App\Enums\EncounterOutcome;
 use App\Enums\ObservationCode;
+use App\Enums\Permission;
 use App\Enums\Priority;
 use App\Http\Requests\BookFollowUpRequest;
 use App\Http\Requests\SaveEncounterRequest;
@@ -14,6 +15,7 @@ use App\Http\Resources\AllergyResource;
 use App\Http\Resources\EncounterAddendumResource;
 use App\Http\Resources\EncounterResource;
 use App\Http\Resources\EncounterSummaryResource;
+use App\Http\Resources\FormSubmissionSummaryResource;
 use App\Http\Resources\ImmunizationResource;
 use App\Http\Resources\LabResultResource;
 use App\Http\Resources\LabTestResource;
@@ -27,9 +29,11 @@ use App\Http\Resources\ServicePointOptionResource;
 use App\Models\Encounter;
 use App\Models\LabTest;
 use App\Models\ServicePoint;
+use App\Models\User;
 use App\Services\AppointmentService;
 use App\Services\CaseSurveillance;
 use App\Services\EncounterService;
+use App\Services\FormCatalogue;
 use App\Services\PatientTimeline;
 use App\Services\ReferralService;
 use App\Services\WorkflowEngine;
@@ -52,6 +56,7 @@ class EncounterController extends Controller
         private readonly ReferralService $referrals,
         private readonly PatientTimeline $timeline,
         private readonly WorkflowEngine $workflows,
+        private readonly FormCatalogue $forms,
     ) {}
 
     /**
@@ -116,12 +121,54 @@ class EncounterController extends Controller
                 'label' => $p->label(),
             ]),
             'outcomes' => EncounterOutcome::options(),
+            // Clinical staff who may be named as the provider when someone
+            // else types the note (retrospective entry from paper).
+            'providers' => User::providers()->orderBy('name')->get(['id', 'name'])
+                ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values(),
+            // Clinical forms (PRD 4.3): those filled on this encounter, and
+            // those its type offers the member of staff that are not yet
+            // started.
+            'forms' => $this->formsFor($request, $encounter),
             'can' => [
                 'document' => $request->user()->can('document', $encounter),
                 'sign' => $request->user()->can('sign', $encounter),
                 'addend' => $request->user()->can('addend', $encounter),
+                'backdate' => $request->user()->hasPermission(Permission::BackdateEncounters),
             ],
         ]);
+    }
+
+    /**
+     * The forms panel: submissions on the encounter and the forms still
+     * available to start.
+     *
+     * @return array{submissions: mixed, available: array<int, array{id: int, name: string, description: string|null, url: string}>}
+     */
+    private function formsFor(Request $request, Encounter $encounter): array
+    {
+        $submissions = $encounter->formSubmissions()
+            ->with(['form:id,slug,name', 'version:id,version', 'filledBy:id,name', 'completedBy:id,name'])
+            ->get();
+
+        $started = $submissions->filter(fn ($s) => ! $s->isVoided())->pluck('form_id');
+
+        $available = $request->user()->can('document', $encounter)
+            ? $this->forms->availableFor($encounter, $request->user())
+                ->reject(fn ($form) => $started->contains($form->id))
+                ->map(fn ($form) => [
+                    'id' => $form->id,
+                    'name' => $form->name,
+                    'description' => $form->description,
+                    'url' => route('encounters.forms.open', [$encounter, $form]),
+                ])
+                ->values()
+                ->all()
+            : [];
+
+        return [
+            'submissions' => FormSubmissionSummaryResource::collection($submissions),
+            'available' => $available,
+        ];
     }
 
     /**
@@ -157,6 +204,8 @@ class EncounterController extends Controller
             nextPriority: Priority::from($request->input('next_priority', Priority::Normal->value)),
             nextNote: $request->input('next_note'),
             nextAssignedTo: $nextAssignee,
+            provider: $request->filled('provider_id') ? User::find($request->integer('provider_id')) : null,
+            encounterAt: $request->filled('encounter_at') ? Carbon::parse($request->input('encounter_at')) : null,
         );
 
         $label = $encounter->type->label();
@@ -223,7 +272,7 @@ class EncounterController extends Controller
             ->signed()
             ->latest('signed_at')
             ->take(10)
-            ->with(['author:id,name', 'servicePoint:id,name', 'codedDiagnoses', 'addenda.author:id,name'])
+            ->with(['author:id,name', 'servicePoint:id,name', 'codedDiagnoses', 'addenda.author:id,name', 'summaryFormSubmissions'])
             ->get();
     }
 }

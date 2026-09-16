@@ -29,6 +29,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import type { SharedData } from '@/types';
 
 type PatientCard = {
     id: number;
@@ -105,6 +106,8 @@ defineOptions({
 // Guard failures from the service (e.g. a bed taken meanwhile) come back
 // under keys that are not form fields.
 const page = usePage();
+// Bed charges are picked without prices when billing is switched off.
+const billingEnabled = usePage<SharedData>().props.facility.billing_enabled;
 const serviceError = computed(
     () => (page.props.errors as Record<string, string> | undefined)?.status,
 );
@@ -980,8 +983,10 @@ const textareaClass =
                                     v-for="c in bedCharges"
                                     :key="c.id"
                                     :value="String(c.id)"
-                                    >{{ c.name }} ·
-                                    {{ money(c.price) }}/day</SelectItem
+                                    >{{ c.name
+                                    }}<template v-if="billingEnabled">
+                                        · {{ money(c.price) }}/day</template
+                                    ></SelectItem
                                 >
                             </SelectContent>
                         </Select>

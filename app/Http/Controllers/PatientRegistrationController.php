@@ -17,6 +17,7 @@ use App\Support\PatientOptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -51,6 +52,11 @@ class PatientRegistrationController extends Controller
             $patient->fill($request->validated());
             $this->applyCoverage($patient);
             $patient->registered_by = $request->user()->id;
+            // Entered from a paper register: the registration keeps the
+            // register's date, not today's.
+            $patient->registered_at = $request->filled('registered_at')
+                ? Carbon::parse($request->input('registered_at'))
+                : now();
             // The file number is issued by the facility's series, not typed.
             $patient->file_number = $numbers->next(NumberKind::Patient);
             $patient->save();
@@ -123,6 +129,11 @@ class PatientRegistrationController extends Controller
                 'marital_status' => $patient->marital_status ?? '',
                 'nin' => $patient->nin ?? '',
                 'phone' => $patient->phone ?? '',
+                'phone_alternate' => $patient->phone_alternate ?? '',
+                'phone_owner' => $patient->phone_owner ?? '',
+                'sms_consent' => $patient->sms_consent,
+                'is_restricted' => $patient->is_restricted,
+                'restricted_reason' => $patient->restricted_reason ?? '',
                 'email' => $patient->email ?? '',
                 'address' => $patient->address ?? '',
                 'nationality' => $patient->nationality ?? '',
@@ -211,6 +222,7 @@ class PatientRegistrationController extends Controller
             'sexes' => PatientOptions::SEXES,
             'maritalStatuses' => PatientOptions::MARITAL_STATUSES,
             'nokRelationships' => PatientOptions::NOK_RELATIONSHIPS,
+            'phoneOwners' => Patient::PHONE_OWNERS,
             'coverages' => PatientOptions::COVERAGES,
             'hmoProviders' => PatientOptions::HMO_PROVIDERS,
             'payers' => $payers->map(fn (Payer $payer) => [

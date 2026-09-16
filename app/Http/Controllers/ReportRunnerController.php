@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Concerns\ResolvesReportRange;
 use App\Models\AuditLog;
 use App\Services\AuditTrail;
@@ -61,6 +62,7 @@ class ReportRunnerController extends Controller
             ],
             'presets' => $this->rangePresetOptions(),
             'exportUrl' => route('reports.export', ['report' => $report, ...$rangeQuery]),
+            'canExport' => ! $this->registry->isLineList($report) || $request->user()->hasPermission(Permission::ExportLineLists),
         ]);
     }
 
@@ -71,6 +73,12 @@ class ReportRunnerController extends Controller
     {
         $definition = $this->registry->find($report);
         abort_if($definition === null || $definition['type'] === 'dashboard', 404);
+
+        // Patient-level line lists leave the building as files; that takes a
+        // permission of its own, beyond seeing the report on screen.
+        if ($this->registry->isLineList($report)) {
+            abort_unless($request->user()->hasPermission(Permission::ExportLineLists), 403);
+        }
 
         [$from, $to] = $this->resolveRange($request);
         $result = $this->registry->run($report, $from, $to);

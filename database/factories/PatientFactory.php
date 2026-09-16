@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\PatientStatus;
 use App\Models\Patient;
 use App\Support\NigeriaLocations;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -49,6 +50,20 @@ class PatientFactory extends Factory
             'is_transfer' => false,
             'visit_category' => 'Outpatient',
             'outpatient_service' => 'Clinical Consultation & Diagnosis',
+            'phone_alternate' => null,
+            'phone_owner' => 'self',
+            'sms_consent' => false,
+            'registered_at' => now(),
+            'status' => PatientStatus::Active,
+            'is_restricted' => false,
         ];
+    }
+
+    /**
+     * A record that opens only with the break-glass permission or a logged reason.
+     */
+    public function restricted(string $reason = 'Sensitive case'): static
+    {
+        return $this->state(fn () => ['is_restricted' => true, 'restricted_reason' => $reason]);
     }
 }

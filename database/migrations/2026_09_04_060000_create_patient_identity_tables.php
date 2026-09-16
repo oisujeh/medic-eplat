@@ -28,6 +28,22 @@ return new class extends Migration
             $table->index(['type', 'value']);
         });
 
+        // How two patients on the register are related: mother and child,
+        // members of one household, an index case and a contact. One row
+        // per direction, written as a pair.
+        Schema::create('patient_relationships', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('patient_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('related_patient_id')->constrained('patients')->cascadeOnDelete();
+            $table->string('type', 30);                       // App\Enums\RelationshipType
+            $table->string('notes')->nullable();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamps();
+
+            $table->unique(['patient_id', 'related_patient_id', 'type']);
+            $table->index('related_patient_id');
+        });
+
         Schema::create('deaths', function (Blueprint $table) {
             $table->id();
             $table->ulid('ulid')->unique();
@@ -53,6 +69,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('deaths');
+        Schema::dropIfExists('patient_relationships');
         Schema::dropIfExists('patient_identifiers');
     }
 };

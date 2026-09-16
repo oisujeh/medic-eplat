@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\FundingSource;
 use App\Models\Concerns\Auditable;
 use App\Models\Contracts\AuditableRecord;
 use Database\Factories\StockBatchFactory;
@@ -24,7 +25,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'inventory_item_id', 'stock_location_id', 'batch_number', 'expiry_date', 'quantity',
-    'cost_price', 'received_by', 'received_at',
+    'cost_price', 'funding_source', 'received_by', 'received_at',
 ])]
 class StockBatch extends Model implements AuditableRecord
 {
@@ -42,6 +43,7 @@ class StockBatch extends Model implements AuditableRecord
             'expiry_date' => 'date',
             'quantity' => 'integer',
             'cost_price' => 'float',
+            'funding_source' => FundingSource::class,
             'received_at' => 'datetime',
         ];
     }

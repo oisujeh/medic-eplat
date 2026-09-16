@@ -20,6 +20,10 @@ return new class extends Migration
             $table->string('code', 10)->unique();
             $table->string('description');
             $table->string('chapter', 100)->nullable();
+            // The ICD-11 code the WHO crosswalk maps this ICD-10 code to,
+            // when the mapping is one-to-one. Loaded with the crosswalk
+            // bundle; ambiguous mappings stay null for HIM review.
+            $table->string('icd11_code', 20)->nullable()->index();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 

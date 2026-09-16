@@ -9,6 +9,7 @@ enum TimelineKind: string
 {
     case Registration = 'registration';
     case Encounter = 'encounter';
+    case Form = 'form';
     case Diagnosis = 'diagnosis';
     case Observation = 'observation';
     case LabOrder = 'lab_order';
@@ -28,6 +29,7 @@ enum TimelineKind: string
         return match ($this) {
             self::Registration => 'Registration',
             self::Encounter => 'Encounter',
+            self::Form => 'Clinical form',
             self::Diagnosis => 'Diagnosis',
             self::Observation => 'Observations',
             self::LabOrder => 'Lab order',
@@ -52,6 +54,7 @@ enum TimelineKind: string
         return match ($this) {
             self::Registration => 'UserPlus',
             self::Encounter => 'Stethoscope',
+            self::Form => 'FileText',
             self::Diagnosis => 'ClipboardList',
             self::Observation => 'Activity',
             self::LabOrder, self::LabResult => 'FlaskConical',

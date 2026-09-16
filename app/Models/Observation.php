@@ -25,7 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $flag
  * @property Carbon $recorded_at
  */
-#[Fillable(['observation_set_id', 'patient_id', 'code', 'value', 'text_value', 'unit', 'level', 'flag', 'recorded_at'])]
+#[Fillable(['observation_set_id', 'patient_id', 'code', 'concept_id', 'value', 'text_value', 'unit', 'level', 'flag', 'recorded_at'])]
 class Observation extends Model implements AuditableRecord
 {
     use Auditable;
@@ -59,6 +59,16 @@ class Observation extends Model implements AuditableRecord
     public function patient(): BelongsTo
     {
         return $this->belongsTo(Patient::class);
+    }
+
+    /**
+     * The dictionary concept this reading is an observation of.
+     *
+     * @return BelongsTo<Concept, $this>
+     */
+    public function concept(): BelongsTo
+    {
+        return $this->belongsTo(Concept::class);
     }
 
     /**

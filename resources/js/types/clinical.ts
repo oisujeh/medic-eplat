@@ -3,6 +3,8 @@
  * app/Http/Resources, which is the only place the backend builds them.
  */
 
+import type { FormSubmissionSummary } from '@/types/forms';
+
 export type Option = { value: string; label: string };
 
 export type Personnel = { id: number; name: string };
@@ -164,6 +166,8 @@ export type EncounterSummary = {
     diagnoses: string[];
     outcome: string | null;
     addenda?: EncounterAddendum[];
+    /** Clinical forms filled on the encounter, when the summary carries them. */
+    forms?: FormSubmissionSummary[];
     url: string;
 };
 

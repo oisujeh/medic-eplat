@@ -6,6 +6,7 @@ use App\Enums\AlertLevel;
 use App\Enums\ObservationCode;
 use App\Events\ObservationRecorded;
 use App\Models\Admission;
+use App\Models\ConceptSource;
 use App\Models\Encounter;
 use App\Models\ObservationSet;
 use App\Models\Patient;
@@ -22,7 +23,34 @@ use Illuminate\Support\Facades\DB;
  */
 class ObservationService
 {
-    public function __construct(private readonly DomainEvents $events) {}
+    /**
+     * Concept ids by observation code, resolved once per request.
+     *
+     * @var array<string, int|null>|null
+     */
+    private ?array $conceptIds = null;
+
+    public function __construct(
+        private readonly DomainEvents $events,
+        private readonly Terminology $terminology,
+    ) {}
+
+    /**
+     * The dictionary concept an observation code is registered as, so every
+     * reading is queryable by concept as well as by code (PRD FRM-03).
+     */
+    public function conceptIdFor(ObservationCode $code): ?int
+    {
+        $this->conceptIds ??= [];
+
+        if (! array_key_exists($code->value, $this->conceptIds)) {
+            $this->conceptIds[$code->value] = $this->terminology
+                ->resolve(ConceptSource::LOCAL, 'OBS-'.strtoupper($code->value))
+                ?->id;
+        }
+
+        return $this->conceptIds[$code->value];
+    }
 
     /**
      * Record a set of readings. `$values` is keyed by ObservationCode value;
@@ -77,6 +105,7 @@ class ObservationService
                 $set->observations()->create([
                     'patient_id' => $patient->id,
                     'code' => $code,
+                    'concept_id' => $this->conceptIdFor($code),
                     'value' => $code->isText() ? null : $reading,
                     'text_value' => $code->isText() ? $reading : null,
                     'unit' => $code->unit(),

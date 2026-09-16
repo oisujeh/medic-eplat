@@ -2,17 +2,21 @@
 
 namespace App\Listeners;
 
+use App\Enums\PatientStatus;
 use App\Events\PatientDied;
 use App\Models\Death;
 
 /**
  * Keeps the death register: whatever clinical record carried a death (a
- * discharge, a delivery) results in one death record on the patient.
+ * discharge, a delivery) results in one death record on the patient, and
+ * the patient's status follows.
  */
 class RecordDeath
 {
     public function handle(PatientDied $event): void
     {
+        $event->patient->changeStatus(PatientStatus::Deceased, 'Death recorded');
+
         Death::query()->updateOrCreate(
             ['patient_id' => $event->patient->id],
             [

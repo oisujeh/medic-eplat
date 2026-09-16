@@ -5,7 +5,12 @@ import { ArrowLeft, Download } from '@lucide/vue';
 type Column = { key: string; label: string; align: 'left' | 'right' };
 
 const props = defineProps<{
-    report: { key: string; name: string; description: string; category: string };
+    report: {
+        key: string;
+        name: string;
+        description: string;
+        category: string;
+    };
     columns: Column[];
     rows: Array<Record<string, string>>;
     summary: Array<{ label: string; value: string }>;
@@ -32,7 +37,9 @@ function applyPreset(key: string) {
 
     <div class="flex h-full flex-1 flex-col gap-5 p-4">
         <!-- Header -->
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div
+            class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+        >
             <div class="flex items-start gap-3">
                 <Link
                     href="/reports"
@@ -42,7 +49,9 @@ function applyPreset(key: string) {
                 </Link>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-2xl font-semibold tracking-tight">{{ report.name }}</h1>
+                        <h1 class="text-2xl font-semibold tracking-tight">
+                            {{ report.name }}
+                        </h1>
                         <span
                             class="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
                             >{{ report.category }}</span
@@ -55,7 +64,9 @@ function applyPreset(key: string) {
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <div class="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1">
+                <div
+                    class="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1"
+                >
                     <button
                         v-for="p in presets"
                         :key="p.key"
@@ -81,14 +92,19 @@ function applyPreset(key: string) {
         </div>
 
         <!-- Summary tiles -->
-        <div v-if="summary.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+            v-if="summary.length"
+            class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        >
             <div
                 v-for="s in summary"
                 :key="s.label"
                 class="rounded-xl border border-border bg-card p-4"
             >
                 <p class="text-sm text-muted-foreground">{{ s.label }}</p>
-                <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+                <p
+                    class="mt-1 text-2xl font-semibold tracking-tight tabular-nums"
+                >
                     {{ s.value }}
                 </p>
             </div>
@@ -96,19 +112,29 @@ function applyPreset(key: string) {
 
         <!-- Table -->
         <div class="rounded-xl border border-border bg-card">
-            <div class="flex items-center justify-between border-b border-border px-4 py-3">
+            <div
+                class="flex items-center justify-between border-b border-border px-4 py-3"
+            >
                 <h2 class="text-sm font-semibold">Results</h2>
-                <span class="text-xs text-muted-foreground">{{ rows.length }} rows</span>
+                <span class="text-xs text-muted-foreground"
+                    >{{ rows.length }} rows</span
+                >
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-border text-xs text-muted-foreground">
+                        <tr
+                            class="border-b border-border text-xs text-muted-foreground"
+                        >
                             <th
                                 v-for="col in columns"
                                 :key="col.key"
                                 class="px-4 py-2.5 font-medium whitespace-nowrap"
-                                :class="col.align === 'right' ? 'text-right' : 'text-left'"
+                                :class="
+                                    col.align === 'right'
+                                        ? 'text-right'
+                                        : 'text-left'
+                                "
                             >
                                 {{ col.label }}
                             </th>
@@ -125,8 +151,12 @@ function applyPreset(key: string) {
                                 :key="col.key"
                                 class="px-4 py-2.5 whitespace-nowrap"
                                 :class="[
-                                    col.align === 'right' ? 'text-right tabular-nums' : 'text-left',
-                                    col.key === columns[0].key ? 'font-medium' : 'text-muted-foreground',
+                                    col.align === 'right'
+                                        ? 'text-right tabular-nums'
+                                        : 'text-left',
+                                    col.key === columns[0].key
+                                        ? 'font-medium'
+                                        : 'text-muted-foreground',
                                 ]"
                             >
                                 {{ row[col.key] }}

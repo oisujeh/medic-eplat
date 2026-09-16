@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  */
 #[Fillable([
-    'bill_id', 'source', 'description', 'quantity', 'unit_price', 'total',
+    'bill_id', 'payer_id', 'source', 'description', 'quantity', 'unit_price', 'total',
     'reference_type', 'reference_id', 'catalogue_version_id', 'created_by',
 ])]
 class BillCharge extends Model implements AuditableRecord
@@ -60,6 +60,16 @@ class BillCharge extends Model implements AuditableRecord
     public function bill(): BelongsTo
     {
         return $this->belongsTo(Bill::class);
+    }
+
+    /**
+     * The payer this line is claimed from; null when the patient pays.
+     *
+     * @return BelongsTo<Payer, $this>
+     */
+    public function payer(): BelongsTo
+    {
+        return $this->belongsTo(Payer::class);
     }
 
     /**

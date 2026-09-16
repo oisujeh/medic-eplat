@@ -23,6 +23,7 @@ class FacilityController extends Controller
     {
         return Inertia::render('admin/Facility', [
             'profile' => $this->facility->profile(),
+            'options' => FacilitySettings::options(),
         ]);
     }
 

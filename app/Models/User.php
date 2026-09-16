@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Enums\Permission;
+use App\Enums\StaffCadre;
 use App\Models\Concerns\Auditable;
 use App\Models\Contracts\AuditableRecord;
+use App\Services\FacilitySettings;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -27,6 +29,9 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $name
  * @property string $email
  * @property string|null $username
+ * @property StaffCadre|null $cadre
+ * @property string|null $registration_number
+ * @property string|null $phone
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $deactivated_at
  * @property string $password
@@ -37,7 +42,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'username', 'password'])]
+#[Fillable(['name', 'email', 'username', 'password', 'cadre', 'registration_number', 'phone'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements AuditableRecord, PasskeyUser
 {
@@ -63,6 +68,7 @@ class User extends Authenticatable implements AuditableRecord, PasskeyUser
             'deactivated_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'cadre' => StaffCadre::class,
         ];
     }
 
@@ -75,6 +81,40 @@ class User extends Authenticatable implements AuditableRecord, PasskeyUser
     protected function active(Builder $query): void
     {
         $query->whereNull('deactivated_at');
+    }
+
+    /**
+     * Limit the query to staff who may be named as the provider on an
+     * encounter: active accounts of a clinical cadre.
+     *
+     * @param  Builder<User>  $query
+     */
+    #[Scope]
+    protected function providers(Builder $query): void
+    {
+        $query->whereNull('deactivated_at')
+            ->whereIn('cadre', array_map(
+                fn (StaffCadre $c) => $c->value,
+                array_filter(StaffCadre::cases(), fn (StaffCadre $c) => $c->isClinical()),
+            ));
+    }
+
+    /**
+     * Whether this member of staff may be recorded as an encounter's provider.
+     */
+    public function isProvider(): bool
+    {
+        return $this->cadre?->isClinical() ?? false;
+    }
+
+    /**
+     * The service points this member of staff is posted to.
+     *
+     * @return BelongsToMany<ServicePoint, $this>
+     */
+    public function servicePoints(): BelongsToMany
+    {
+        return $this->belongsToMany(ServicePoint::class);
     }
 
     /**
@@ -148,13 +188,24 @@ class User extends Authenticatable implements AuditableRecord, PasskeyUser
      */
     public function accessibleModules(): Collection
     {
-        if ($this->hasFullModuleAccess()) {
-            return Module::active()->get();
-        }
+        $modules = $this->hasFullModuleAccess()
+            ? Module::active()->get()
+            : Module::active()
+                ->whereHas('roles', fn ($query) => $query->whereIn('roles.id', $this->roles->pluck('id')))
+                ->get();
 
-        return Module::active()
-            ->whereHas('roles', fn ($query) => $query->whereIn('roles.id', $this->roles->pluck('id')))
-            ->get();
+        return $modules->reject(fn (Module $module) => $this->moduleSwitchedOff($module->slug))->values();
+    }
+
+    /**
+     * Whether a facility-level switch has taken the module out of use for
+     * everyone, whatever their role. Billing off hides billing and claims
+     * (PRD BIL-01).
+     */
+    private function moduleSwitchedOff(string $slug): bool
+    {
+        return in_array($slug, Module::BILLING_MODULES, true)
+            && ! app(FacilitySettings::class)->billingEnabled();
     }
 
     /**
@@ -196,6 +247,10 @@ class User extends Authenticatable implements AuditableRecord, PasskeyUser
      */
     public function canAccessModule(string $slug): bool
     {
+        if ($this->moduleSwitchedOff($slug)) {
+            return false;
+        }
+
         if ($this->hasFullModuleAccess()) {
             return Module::active()->where('slug', $slug)->exists();
         }

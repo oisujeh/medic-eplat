@@ -46,7 +46,10 @@ const center = computed(() => props.size / 2);
 
 <template>
     <div class="flex flex-wrap items-center gap-x-6 gap-y-4">
-        <div class="relative shrink-0" :style="{ width: `${size}px`, height: `${size}px` }">
+        <div
+            class="relative shrink-0"
+            :style="{ width: `${size}px`, height: `${size}px` }"
+        >
             <svg :width="size" :height="size" class="block -rotate-90">
                 <!-- track -->
                 <circle
@@ -81,9 +84,14 @@ const center = computed(() => props.size / 2);
                 <span class="text-lg font-semibold tabular-nums">{{
                     format(hoverIndex !== null ? arcs[hoverIndex].value : total)
                 }}</span>
-                <span class="max-w-[80%] truncate text-[11px] text-muted-foreground">{{
-                    hoverIndex !== null ? arcs[hoverIndex].label : (centerLabel ?? 'Total')
-                }}</span>
+                <span
+                    class="max-w-[80%] truncate text-[11px] text-muted-foreground"
+                    >{{
+                        hoverIndex !== null
+                            ? arcs[hoverIndex].label
+                            : (centerLabel ?? 'Total')
+                    }}</span
+                >
             </div>
         </div>
 
@@ -93,7 +101,9 @@ const center = computed(() => props.size / 2);
                 v-for="(a, i) in arcs"
                 :key="i"
                 class="flex items-center gap-2 text-sm"
-                :class="hoverIndex !== null && hoverIndex !== i ? 'opacity-50' : ''"
+                :class="
+                    hoverIndex !== null && hoverIndex !== i ? 'opacity-50' : ''
+                "
                 @pointerenter="hoverIndex = i"
                 @pointerleave="hoverIndex = null"
             >
@@ -108,14 +118,11 @@ const center = computed(() => props.size / 2);
                     format(a.value)
                 }}</span>
                 <span
-                    class="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground"
+                    class="w-9 shrink-0 text-right text-xs text-muted-foreground tabular-nums"
                     >{{ a.percent }}%</span
                 >
             </li>
-            <li
-                v-if="!segments.length"
-                class="text-sm text-muted-foreground"
-            >
+            <li v-if="!segments.length" class="text-sm text-muted-foreground">
                 No data in this period.
             </li>
         </ul>

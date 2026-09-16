@@ -33,6 +33,11 @@ class SignEncounterRequest extends FormRequest
         return [
             ...$this->documentationRules($this->encounter()->type),
 
+            // Attribution for retrospective entry: the clinician who saw the
+            // patient and the date they did, when not the signer and today.
+            'provider_id' => ['nullable', Rule::exists('users', 'id')->whereNull('deactivated_at')],
+            'encounter_at' => ['nullable', 'date', 'before_or_equal:now'],
+
             // Disposition (optional onward routing)
             'next_service_point_id' => ['nullable', Rule::exists('service_points', 'id')->where('is_active', true)],
             'next_assigned_to' => ['nullable', Rule::exists('users', 'id')],

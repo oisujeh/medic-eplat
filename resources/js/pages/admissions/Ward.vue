@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, BedDouble, Pencil, Plus, Wrench } from '@lucide/vue';
 import { ref } from 'vue';
 import InputError from '@/components/InputError.vue';
@@ -22,6 +22,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import type { SharedData } from '@/types';
+
+// Bed charges show without prices when billing is switched off.
+const billingEnabled = usePage<SharedData>().props.facility.billing_enabled;
 
 type Occupant = {
     name: string;
@@ -186,11 +190,13 @@ function submitEdit() {
                     <p class="mt-1 text-sm text-muted-foreground">
                         <span class="font-mono">{{ ward.code }}</span>
                         · {{ ward.type_label }}
-                        <span v-if="ward.bed_charge">
-                            · {{ ward.bed_charge.name }},
-                            {{ money(ward.bed_charge.price) }} per day</span
-                        >
-                        <span v-else> · no bed charge</span>
+                        <template v-if="billingEnabled">
+                            <span v-if="ward.bed_charge">
+                                · {{ ward.bed_charge.name }},
+                                {{ money(ward.bed_charge.price) }} per day</span
+                            >
+                            <span v-else> · no bed charge</span>
+                        </template>
                     </p>
                     <p
                         v-if="ward.description"
@@ -436,8 +442,10 @@ function submitEdit() {
                                     v-for="c in bedCharges"
                                     :key="c.id"
                                     :value="String(c.id)"
-                                    >{{ c.name }} ·
-                                    {{ money(c.price) }}/day</SelectItem
+                                    >{{ c.name
+                                    }}<template v-if="billingEnabled">
+                                        · {{ money(c.price) }}/day</template
+                                    ></SelectItem
                                 >
                             </SelectContent>
                         </Select>

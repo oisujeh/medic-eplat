@@ -25,6 +25,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 type Role = {
     id: number;
@@ -33,11 +40,23 @@ type Role = {
     grants_all_modules?: boolean;
 };
 
+type Cadre = {
+    value: string;
+    label: string;
+    clinical: boolean;
+    registration_body: string | null;
+};
+
 type StaffUser = {
     id: number;
     name: string;
     email: string;
     username: string | null;
+    cadre: string | null;
+    cadre_label: string | null;
+    is_provider: boolean;
+    registration_number: string | null;
+    phone: string | null;
     roles: Role[];
     role_ids: number[];
     created_at: string | null;
@@ -57,6 +76,7 @@ type Paginated<T> = {
 
 const props = defineProps<{
     users: Paginated<StaffUser>;
+    cadres: Cadre[];
     roles: Role[];
 }>();
 
@@ -84,6 +104,9 @@ const addForm = useForm<{
     name: string;
     username: string;
     email: string;
+    cadre: string;
+    registration_number: string;
+    phone: string;
     password: string;
     password_confirmation: string;
     roles: number[];
@@ -91,10 +114,20 @@ const addForm = useForm<{
     name: '',
     username: '',
     email: '',
+    cadre: '',
+    registration_number: '',
+    phone: '',
     password: '',
     password_confirmation: '',
     roles: [],
 });
+
+/** The council that registers a cadre, for the registration-number hint. */
+function registrationBody(cadre: string): string | null {
+    return (
+        props.cadres.find((c) => c.value === cadre)?.registration_body ?? null
+    );
+}
 
 function add() {
     addForm.post('/admin/users', {
@@ -111,11 +144,17 @@ const editForm = useForm<{
     name: string;
     username: string;
     email: string;
+    cadre: string;
+    registration_number: string;
+    phone: string;
     roles: number[];
 }>({
     name: '',
     username: '',
     email: '',
+    cadre: '',
+    registration_number: '',
+    phone: '',
     roles: [],
 });
 
@@ -124,6 +163,9 @@ function openEdit(user: StaffUser) {
     editForm.name = user.name;
     editForm.username = user.username ?? '';
     editForm.email = user.email;
+    editForm.cadre = user.cadre ?? '';
+    editForm.registration_number = user.registration_number ?? '';
+    editForm.phone = user.phone ?? '';
     editForm.roles = [...user.role_ids];
     editForm.clearErrors();
 }
@@ -263,6 +305,15 @@ function confirmDelete() {
                                 class="font-mono text-xs text-muted-foreground"
                             >
                                 {{ u.username }}
+                            </div>
+                            <div
+                                v-if="u.cadre_label"
+                                class="text-xs text-muted-foreground"
+                            >
+                                {{ u.cadre_label
+                                }}<template v-if="u.registration_number">
+                                    · {{ u.registration_number }}</template
+                                >
                             </div>
                         </td>
                         <td class="px-4 py-2.5 text-muted-foreground">
@@ -437,6 +488,53 @@ function confirmDelete() {
                         <InputError :message="addForm.errors.email" />
                     </div>
                     <div class="grid gap-1.5">
+                        <Label>Cadre</Label>
+                        <Select v-model="addForm.cadre">
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="Select cadre" />
+                            </SelectTrigger>
+                            <SelectContent class="max-h-72">
+                                <SelectItem
+                                    v-for="c in cadres"
+                                    :key="c.value"
+                                    :value="c.value"
+                                    >{{ c.label }}</SelectItem
+                                >
+                            </SelectContent>
+                        </Select>
+                        <p class="text-xs text-muted-foreground">
+                            Clinical cadres can be named as the provider on a
+                            note.
+                        </p>
+                        <InputError :message="addForm.errors.cadre" />
+                    </div>
+                    <div class="grid gap-1.5">
+                        <Label>
+                            Registration number
+                            <span
+                                v-if="registrationBody(addForm.cadre)"
+                                class="text-muted-foreground"
+                                >({{ registrationBody(addForm.cadre) }})</span
+                            >
+                        </Label>
+                        <Input
+                            v-model="addForm.registration_number"
+                            class="font-mono"
+                            placeholder="e.g. MDCN/12345"
+                        />
+                        <InputError
+                            :message="addForm.errors.registration_number"
+                        />
+                    </div>
+                    <div class="grid gap-1.5 sm:col-span-2">
+                        <Label>Phone</Label>
+                        <Input
+                            v-model="addForm.phone"
+                            placeholder="e.g. 0803 123 4567"
+                        />
+                        <InputError :message="addForm.errors.phone" />
+                    </div>
+                    <div class="grid gap-1.5">
                         <Label>Initial password *</Label>
                         <PasswordInput v-model="addForm.password" />
                         <InputError :message="addForm.errors.password" />
@@ -518,6 +616,45 @@ function confirmDelete() {
                         <Label>Email *</Label>
                         <Input v-model="editForm.email" type="email" />
                         <InputError :message="editForm.errors.email" />
+                    </div>
+                    <div class="grid gap-1.5">
+                        <Label>Cadre</Label>
+                        <Select v-model="editForm.cadre">
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="Select cadre" />
+                            </SelectTrigger>
+                            <SelectContent class="max-h-72">
+                                <SelectItem
+                                    v-for="c in cadres"
+                                    :key="c.value"
+                                    :value="c.value"
+                                    >{{ c.label }}</SelectItem
+                                >
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="editForm.errors.cadre" />
+                    </div>
+                    <div class="grid gap-1.5">
+                        <Label>
+                            Registration number
+                            <span
+                                v-if="registrationBody(editForm.cadre)"
+                                class="text-muted-foreground"
+                                >({{ registrationBody(editForm.cadre) }})</span
+                            >
+                        </Label>
+                        <Input
+                            v-model="editForm.registration_number"
+                            class="font-mono"
+                        />
+                        <InputError
+                            :message="editForm.errors.registration_number"
+                        />
+                    </div>
+                    <div class="grid gap-1.5 sm:col-span-2">
+                        <Label>Phone</Label>
+                        <Input v-model="editForm.phone" />
+                        <InputError :message="editForm.errors.phone" />
                     </div>
 
                     <div class="grid gap-2 sm:col-span-2">

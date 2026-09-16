@@ -470,11 +470,9 @@ function pageLabel(label: string): string {
                                         </tr>
                                     </tbody>
                                 </table>
-                                <p
-                                    v-if="e.reason"
-                                    class="mt-2 text-xs"
-                                >
-                                    <span class="font-medium text-muted-foreground"
+                                <p v-if="e.reason" class="mt-2 text-xs">
+                                    <span
+                                        class="font-medium text-muted-foreground"
                                         >Reason</span
                                     >
                                     {{ e.reason }}

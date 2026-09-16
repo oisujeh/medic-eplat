@@ -28,12 +28,17 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'patient_id', 'encounter_id', 'recorded_by', 'name', 'code', 'icd_code_id',
-    'status', 'role', 'onset_date', 'resolved_date', 'notes',
+    'status', 'role', 'certainty', 'onset_date', 'resolved_date', 'notes',
 ])]
 class Problem extends Model implements AuditableRecord
 {
     /** @use HasFactory<ProblemFactory> */
     use Auditable, HasFactory;
+
+    /** A working diagnosis still to be confirmed; picked up by the HIM coding worklist. */
+    public const CERTAINTY_PROVISIONAL = 'provisional';
+
+    public const CERTAINTY_CONFIRMED = 'confirmed';
 
     public const STATUS_ACTIVE = 'active';
 

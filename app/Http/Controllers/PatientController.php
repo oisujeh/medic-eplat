@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Priority;
+use App\Enums\RelationshipType;
 use App\Http\Resources\EncounterSummaryResource;
 use App\Http\Resources\ObservationSetResource;
 use App\Models\Patient;
+use App\Models\PatientRelationship;
 use App\Models\QueueEntry;
 use App\Models\ServicePoint;
 use App\Models\Workflow;
 use App\Services\DuplicateReview;
 use App\Services\PatientTimeline;
+use App\Services\RestrictedRecords;
 use App\Support\PatientOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,7 +74,7 @@ class PatientController extends Controller
      * Display a single patient's profile. A merged record leads to the one
      * that survived.
      */
-    public function show(Request $request, Patient $patient, PatientTimeline $timeline): Response|RedirectResponse
+    public function show(Request $request, Patient $patient, PatientTimeline $timeline, RestrictedRecords $restricted): Response|RedirectResponse
     {
         if ($patient->isMerged()) {
             Inertia::flash('toast', ['type' => 'info', 'message' => "{$patient->file_number} was merged into {$patient->mergedInto?->file_number}."]);
@@ -79,14 +82,40 @@ class PatientController extends Controller
             return to_route('patients.show', $patient->merged_into_id);
         }
 
-        $patient->load('registeredBy:id,name', 'death', 'mother:id,file_number,surname,first_name,other_names');
         $user = $request->user();
+
+        // A restricted record shows only its cover until the reason for
+        // opening it has been logged (or the user holds the permission).
+        if (! $restricted->canOpen($patient, $user, $request->session())) {
+            return Inertia::render('patients/Restricted', [
+                'patient' => [
+                    'id' => $patient->id,
+                    'file_number' => $patient->file_number,
+                    'initials' => $patient->initials(),
+                    'restricted_reason' => $patient->restricted_reason,
+                ],
+            ]);
+        }
+
+        $patient->load(
+            'registeredBy:id,name',
+            'death',
+            'mother:id,file_number,surname,first_name,other_names',
+            'relationships.related:id,file_number,surname,first_name,other_names,sex,date_of_birth',
+        );
 
         return Inertia::render('patients/Show', [
             'patient' => [
                 'id' => $patient->id,
                 'file_number' => $patient->file_number,
                 'nin' => $patient->nin,
+                'status' => $patient->status->value,
+                'status_label' => $patient->status->label(),
+                'is_restricted' => $patient->is_restricted,
+                'restricted_reason' => $patient->restricted_reason,
+                'phone_alternate' => $patient->phone_alternate,
+                'phone_owner' => $patient->phone_owner,
+                'sms_consent' => $patient->sms_consent,
                 'dob_estimated' => $patient->dob_estimated,
                 'ward' => $patient->ward,
                 'deceased_at' => $patient->death?->died_at->isoFormat('D MMM YYYY'),
@@ -131,9 +160,21 @@ class PatientController extends Controller
                 'visit_category' => $patient->visit_category,
                 'outpatient_service' => $patient->outpatient_service,
                 'registered_by' => $patient->registeredBy?->name,
-                'registered_at' => $patient->created_at?->isoFormat('D MMM YYYY, h:mm a'),
-                'registered_at_diff' => $patient->created_at?->diffForHumans(),
+                'registered_at' => ($patient->registered_at ?? $patient->created_at)?->isoFormat('D MMM YYYY, h:mm a'),
+                'registered_at_diff' => ($patient->registered_at ?? $patient->created_at)?->diffForHumans(),
             ],
+            'relationships' => $patient->relationships->map(fn (PatientRelationship $link) => [
+                'id' => $link->id,
+                'type' => $link->type->value,
+                'type_label' => $link->type->label(),
+                'notes' => $link->notes,
+                'name' => $link->related->fullName(),
+                'file_number' => $link->related->file_number,
+                'sex' => $link->related->sex,
+                'age' => $link->related->age(),
+                'url' => route('patients.show', $link->related),
+            ])->values(),
+            'relationshipTypes' => RelationshipType::options(),
             'openVisit' => $this->presentOpenVisit($patient),
             'activeAdmission' => $this->presentActiveAdmission($patient),
             'activePregnancy' => $this->presentActivePregnancy($patient),
@@ -145,7 +186,7 @@ class PatientController extends Controller
                 $patient->observationSets()->with('observations', 'recordedBy:id,name')->take(12)->get(),
             ),
             'encounters' => EncounterSummaryResource::collection(
-                $patient->encounters()->with(['author:id,name', 'servicePoint:id,name', 'codedDiagnoses', 'addenda.author:id,name'])->take(30)->get(),
+                $patient->encounters()->with(['author:id,name', 'servicePoint:id,name', 'codedDiagnoses', 'addenda.author:id,name', 'summaryFormSubmissions'])->take(30)->get(),
             ),
             'servicePoints' => ServicePoint::active()->get()
                 ->map(fn (ServicePoint $sp) => [

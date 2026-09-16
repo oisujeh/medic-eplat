@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { Building2, ScrollText, Users } from '@lucide/vue';
+import { Building2, ClipboardList, ScrollText, Users } from '@lucide/vue';
 import { index as auditIndex } from '@/routes/admin/audit';
 import { edit as editFacility } from '@/routes/admin/facility';
+import { index as formsIndex } from '@/routes/admin/forms';
 import { index as usersIndex } from '@/routes/admin/users';
 
 defineProps<{
-    current: 'users' | 'facility' | 'audit';
+    current: 'users' | 'facility' | 'forms' | 'audit';
 }>();
 
 const tabs = [
@@ -16,6 +17,12 @@ const tabs = [
         title: 'Facility profile',
         href: editFacility(),
         icon: Building2,
+    },
+    {
+        key: 'forms',
+        title: 'Clinical forms',
+        href: formsIndex(),
+        icon: ClipboardList,
     },
     {
         key: 'audit',

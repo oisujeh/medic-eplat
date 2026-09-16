@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FundingSource;
 use App\Enums\InventoryCategory;
 use App\Enums\Permission;
 use App\Exceptions\InsufficientStockException;
@@ -97,7 +98,9 @@ class InventoryController extends Controller
                 'on_hand' => $item->quantityAt($l),
             ]),
             'receiving_location_id' => $this->locations->receiving()->id,
+            'fundingSources' => FundingSource::options(),
             'batches' => $item->batches->map(fn (StockBatch $b) => [
+                'funding_source' => $b->funding_source?->label(),
                 'id' => $b->id,
                 'batch_number' => $b->batch_number,
                 'expiry_date' => $b->expiry_date?->isoFormat('D MMM YYYY'),
@@ -150,6 +153,7 @@ class InventoryController extends Controller
             'batch_number' => ['nullable', 'string', 'max:100'],
             'expiry_date' => ['nullable', 'date', 'after:today'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'funding_source' => ['nullable', Rule::enum(FundingSource::class)],
             'stock_location_id' => ['nullable', 'integer', Rule::exists('stock_locations', 'id')->where('is_active', true)],
         ]);
 

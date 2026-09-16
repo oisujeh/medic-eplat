@@ -23,6 +23,7 @@ import {
 type Batch = {
     id: number;
     batch_number: string | null;
+    funding_source: string | null;
     expiry_date: string | null;
     quantity: number;
     is_expired: boolean;
@@ -30,6 +31,7 @@ type Batch = {
 };
 
 const props = defineProps<{
+    fundingSources: Array<{ value: string; label: string }>;
     item: {
         id: number;
         code: string;
@@ -76,6 +78,7 @@ const receiveForm = useForm({
     batch_number: '',
     expiry_date: '',
     cost_price: '',
+    funding_source: '',
     stock_location_id: String(props.receiving_location_id),
 });
 
@@ -227,6 +230,23 @@ function money(v: number | null): string {
                     />
                 </div>
                 <div class="grid gap-1.5">
+                    <Label>Paid for by</Label>
+                    <Select v-model="receiveForm.funding_source">
+                        <SelectTrigger class="w-full">
+                            <SelectValue placeholder="Item's usual source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="s in fundingSources"
+                                :key="s.value"
+                                :value="s.value"
+                                >{{ s.label }}</SelectItem
+                            >
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="receiveForm.errors.funding_source" />
+                </div>
+                <div class="grid gap-1.5">
                     <Label>Into</Label>
                     <Select v-model="receiveForm.stock_location_id">
                         <SelectTrigger class="w-full">
@@ -266,6 +286,7 @@ function money(v: number | null): string {
                             <th class="py-2 pr-3 font-medium">Batch</th>
                             <th class="py-2 pr-3 font-medium">Location</th>
                             <th class="py-2 pr-3 font-medium">Expiry</th>
+                            <th class="py-2 pr-3 font-medium">Source</th>
                             <th class="py-2 pr-3 font-medium">Qty</th>
                             <th class="py-2 font-medium"></th>
                         </tr>
@@ -290,6 +311,9 @@ function money(v: number | null): string {
                                         b.is_expired ? ' (expired)' : ''
                                     }}</span
                                 >
+                            </td>
+                            <td class="py-2 pr-3 text-muted-foreground">
+                                {{ b.funding_source ?? '—' }}
                             </td>
                             <td class="py-2 pr-3 font-medium">
                                 {{ b.quantity }}

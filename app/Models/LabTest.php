@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -41,6 +42,48 @@ class LabTest extends Model implements AuditableRecord
 {
     /** @use HasFactory<LabTestFactory> */
     use Auditable, HasCatalogueVersions, HasFactory;
+
+    /**
+     * Reference limits by age band and sex, most specific first.
+     *
+     * @return HasMany<LabReferenceRange, $this>
+     */
+    public function referenceRanges(): HasMany
+    {
+        return $this->hasMany(LabReferenceRange::class)
+            ->orderByRaw('sex is null')
+            ->orderByDesc('age_min_days');
+    }
+
+    /**
+     * The limits that apply to a patient of this age (in days) and sex:
+     * the most specific banded range, or the test's own single range.
+     *
+     * @return array{low: float|null, high: float|null, critical_low: float|null, critical_high: float|null, text: string|null}
+     */
+    public function rangeFor(?int $ageDays, ?string $sex): array
+    {
+        $band = $this->referenceRanges
+            ->first(fn (LabReferenceRange $range) => $range->covers($ageDays, $sex));
+
+        if ($band !== null) {
+            return [
+                'low' => $band->low,
+                'high' => $band->high,
+                'critical_low' => $band->critical_low,
+                'critical_high' => $band->critical_high,
+                'text' => $band->text ?? $this->reference_text,
+            ];
+        }
+
+        return [
+            'low' => $this->reference_low,
+            'high' => $this->reference_high,
+            'critical_low' => null,
+            'critical_high' => null,
+            'text' => $this->reference_text,
+        ];
+    }
 
     /**
      * Get the attributes that should be cast.

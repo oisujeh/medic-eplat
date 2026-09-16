@@ -2,21 +2,28 @@
 
 use App\Http\Controllers\Admin\AuditLogController as AdminAuditLogController;
 use App\Http\Controllers\Admin\FacilityController as AdminFacilityController;
+use App\Http\Controllers\Admin\FormDesignerController as AdminFormDesignerController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\AdmissionController;
 use App\Http\Controllers\AllergyController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\ClaimBatchController;
 use App\Http\Controllers\ClaimController;
 use App\Http\Controllers\ClinicalController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataQualityController;
+use App\Http\Controllers\DataQualityRuleController;
+use App\Http\Controllers\DataQualityScorecardController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DuplicateController;
 use App\Http\Controllers\EncounterController;
+use App\Http\Controllers\FormSubmissionController;
 use App\Http\Controllers\IcdCodeController;
 use App\Http\Controllers\ImmunizationController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\LabCatalogueController;
 use App\Http\Controllers\LaboratoryController;
 use App\Http\Controllers\LabOrderController;
 use App\Http\Controllers\MaternityController;
@@ -27,7 +34,9 @@ use App\Http\Controllers\NursingController;
 use App\Http\Controllers\ObservationController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PatientRegistrationController;
+use App\Http\Controllers\PatientRelationshipController;
 use App\Http\Controllers\PatientRoutingController;
+use App\Http\Controllers\PatientStatusController;
 use App\Http\Controllers\PayerController;
 use App\Http\Controllers\PharmacyController;
 use App\Http\Controllers\ProblemController;
@@ -80,12 +89,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('patients/duplicates/{candidate}/dismiss', [DuplicateController::class, 'dismiss'])->name('patients.duplicates.dismiss');
         Route::post('patients/duplicates/{candidate}/merge', [DuplicateController::class, 'merge'])->name('patients.duplicates.merge')->middleware('permission:patients.merge');
         Route::get('patients/{patient}/edit', [PatientRegistrationController::class, 'edit'])->name('patients.edit');
+        Route::patch('patients/{patient}/status', [PatientStatusController::class, 'update'])->name('patients.status');
+        Route::get('patients/{patient}/relationships/search', [PatientRelationshipController::class, 'search'])->name('patients.relationships.search');
+        Route::post('patients/{patient}/relationships', [PatientRelationshipController::class, 'store'])->name('patients.relationships.store');
+        Route::delete('patients/{patient}/relationships/{relationship}', [PatientRelationshipController::class, 'destroy'])->name('patients.relationships.destroy');
         Route::patch('patients/{patient}', [PatientRegistrationController::class, 'update'])->name('patients.update');
     });
 
     Route::middleware('module:patient-records')->group(function () {
         Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
         Route::get('patients/{patient}', [PatientController::class, 'show'])->name('patients.show');
+        Route::post('patients/{patient}/break-glass', [BreakGlassController::class, 'store'])->name('patients.break-glass');
     });
 
     // Patient flow — service-point queues.
@@ -164,6 +178,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('encounters/{encounter}/immunizations', [ImmunizationController::class, 'store'])->name('encounters.immunizations.store');
 
+    // Clinical forms (PRD 4.3): started from the encounter, filled on their
+    // own screen, authorised by the encounter policy and the form's roles.
+    Route::get('encounters/{encounter}/forms/{form}', [FormSubmissionController::class, 'open'])->name('encounters.forms.open');
+    Route::get('forms/{submission}', [FormSubmissionController::class, 'show'])->name('forms.show');
+    Route::patch('forms/{submission}', [FormSubmissionController::class, 'save'])->name('forms.save');
+    Route::post('forms/{submission}/complete', [FormSubmissionController::class, 'complete'])->name('forms.complete');
+    Route::post('forms/{submission}/void', [FormSubmissionController::class, 'void'])->name('forms.void');
+
     // Referrals are issued from the encounter (authorised by the encounter
     // policy) and tracked in the referrals module.
     Route::post('encounters/{encounter}/referrals', [ReferralController::class, 'store'])->name('encounters.referrals.store');
@@ -234,6 +256,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Laboratory module — specimen processing, result entry and verification.
     Route::middleware('module:laboratory')->group(function () {
         Route::get('laboratory', [LaboratoryController::class, 'index'])->name('laboratory.index');
+
+        Route::get('laboratory/catalogue', [LabCatalogueController::class, 'index'])->name('laboratory.catalogue.index');
+        Route::get('laboratory/catalogue/{test}', [LabCatalogueController::class, 'show'])->name('laboratory.catalogue.show');
+        Route::post('laboratory/catalogue/{test}/ranges', [LabCatalogueController::class, 'storeRange'])->name('laboratory.catalogue.ranges.store')->middleware('permission:laboratory.manage_catalogue');
+        Route::delete('laboratory/catalogue/{test}/ranges/{range}', [LabCatalogueController::class, 'destroyRange'])->name('laboratory.catalogue.ranges.destroy')->middleware('permission:laboratory.manage_catalogue');
+
         Route::get('laboratory/{order}', [LaboratoryController::class, 'show'])->name('laboratory.show');
         Route::post('laboratory/{order}/collect', [LaboratoryController::class, 'collect'])->name('laboratory.collect');
         Route::post('laboratory/{order}/receive', [LaboratoryController::class, 'receive'])->name('laboratory.receive');
@@ -322,6 +350,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('reports/run/{report}/export', [ReportRunnerController::class, 'export'])->name('reports.export');
     });
 
+    // Data quality module — the issue queue, the scorecard and the rules
+    // that raise them.
+    Route::middleware('module:data-quality')->group(function () {
+        Route::get('data-quality', [DataQualityController::class, 'index'])->name('data-quality.index');
+        Route::get('data-quality/scorecard', [DataQualityScorecardController::class, 'show'])->name('data-quality.scorecard');
+
+        Route::get('data-quality/rules', [DataQualityRuleController::class, 'index'])->name('data-quality.rules.index');
+        Route::patch('data-quality/rules/{rule}', [DataQualityRuleController::class, 'update'])->name('data-quality.rules.update')->middleware('permission:data-quality.manage_rules');
+
+        Route::post('data-quality/issues/{issue}/recheck', [DataQualityController::class, 'recheck'])->name('data-quality.issues.recheck');
+        Route::post('data-quality/issues/{issue}/waive', [DataQualityController::class, 'waive'])->name('data-quality.issues.waive')->middleware('permission:data-quality.waive_issues');
+    });
+
     // Administration module — staff accounts and role assignment. The
     // administration module maps to no roles, so only a role granting all
     // modules (Super Administrator) reaches these routes.
@@ -339,6 +380,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // The audit trail — read-only, plus an on-demand hash-chain check.
         Route::get('admin/audit', [AdminAuditLogController::class, 'index'])->name('admin.audit.index');
         Route::post('admin/audit/verify', [AdminAuditLogController::class, 'verify'])->name('admin.audit.verify');
+
+        // The form designer: the catalogue of clinical forms and their
+        // working drafts. Reading is open to the module; changing needs
+        // the forms permission.
+        Route::get('admin/forms', [AdminFormDesignerController::class, 'index'])->name('admin.forms.index');
+        Route::post('admin/forms', [AdminFormDesignerController::class, 'store'])->name('admin.forms.store')->middleware('permission:forms.manage');
+        Route::post('admin/forms/import', [AdminFormDesignerController::class, 'import'])->name('admin.forms.import')->middleware('permission:forms.manage');
+        Route::get('admin/forms/{form}', [AdminFormDesignerController::class, 'show'])->name('admin.forms.show');
+        Route::patch('admin/forms/{form}', [AdminFormDesignerController::class, 'update'])->name('admin.forms.update')->middleware('permission:forms.manage');
+        Route::post('admin/forms/{form}/publish', [AdminFormDesignerController::class, 'publish'])->name('admin.forms.publish')->middleware('permission:forms.manage');
+        Route::post('admin/forms/{form}/retire', [AdminFormDesignerController::class, 'retire'])->name('admin.forms.retire')->middleware('permission:forms.manage');
+        Route::post('admin/forms/{form}/restore', [AdminFormDesignerController::class, 'restore'])->name('admin.forms.restore')->middleware('permission:forms.manage');
+        Route::get('admin/forms/{form}/export', [AdminFormDesignerController::class, 'export'])->name('admin.forms.export');
     });
 
     // Queue management: attending happens in the consoles; these fix the queue.

@@ -6,6 +6,7 @@ import {
     BedDouble,
     ClipboardList,
     ExternalLink,
+    FileText,
     FlaskConical,
     HeartOff,
     LogOut,
@@ -38,6 +39,7 @@ const props = withDefaults(
 const icons: Record<string, unknown> = {
     UserPlus,
     Stethoscope,
+    FileText,
     ClipboardList,
     Activity,
     FlaskConical,
@@ -81,10 +83,16 @@ const visible = computed(() =>
 );
 
 const groups = computed(() => {
-    const byDate = new Map<string, { label: string; entries: TimelineEntry[] }>();
+    const byDate = new Map<
+        string,
+        { label: string; entries: TimelineEntry[] }
+    >();
 
     for (const e of visible.value) {
-        const group = byDate.get(e.date) ?? { label: e.date_label, entries: [] };
+        const group = byDate.get(e.date) ?? {
+            label: e.date_label,
+            entries: [],
+        };
         group.entries.push(e);
         byDate.set(e.date, group);
     }
@@ -134,7 +142,9 @@ const iconClass = (tone: string) =>
             >
                 <component :is="icons[k.icon]" class="size-3.5" />
                 {{ k.label }}
-                <span class="tabular-nums text-muted-foreground">{{ k.count }}</span>
+                <span class="text-muted-foreground tabular-nums">{{
+                    k.count
+                }}</span>
             </button>
             <button
                 v-if="hidden.size"
@@ -173,7 +183,9 @@ const iconClass = (tone: string) =>
                         >
                             {{ e.title }}
                         </component>
-                        <span class="shrink-0 text-[11px] text-muted-foreground">
+                        <span
+                            class="shrink-0 text-[11px] text-muted-foreground"
+                        >
                             {{ e.date }}
                         </span>
                     </div>
@@ -195,18 +207,29 @@ const iconClass = (tone: string) =>
                 >
                     {{ g.label }}
                 </h3>
-                <ol class="relative ml-3 flex flex-col gap-3 border-l border-border pl-5">
+                <ol
+                    class="relative ml-3 flex flex-col gap-3 border-l border-border pl-5"
+                >
                     <li v-for="e in g.entries" :key="e.key" class="relative">
                         <span
-                            class="absolute -left-[1.85rem] top-0.5 flex size-6 items-center justify-center rounded-full border bg-card"
+                            class="absolute top-0.5 -left-[1.85rem] flex size-6 items-center justify-center rounded-full border bg-card"
                             :class="iconClass(e.tone)"
                         >
                             <component :is="icons[e.icon]" class="size-3.5" />
                         </span>
-                        <div class="rounded-lg border border-border bg-card px-4 py-3">
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span class="font-mono text-xs text-muted-foreground">{{ e.time }}</span>
-                                <span class="text-xs text-muted-foreground">{{ e.kind_label }}</span>
+                        <div
+                            class="rounded-lg border border-border bg-card px-4 py-3"
+                        >
+                            <div
+                                class="flex flex-wrap items-center gap-x-2 gap-y-1"
+                            >
+                                <span
+                                    class="font-mono text-xs text-muted-foreground"
+                                    >{{ e.time }}</span
+                                >
+                                <span class="text-xs text-muted-foreground">{{
+                                    e.kind_label
+                                }}</span>
                                 <span
                                     v-if="e.badge"
                                     class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
@@ -221,14 +244,19 @@ const iconClass = (tone: string) =>
                                     Open <ExternalLink class="size-3" />
                                 </Link>
                             </div>
-                            <p class="mt-1 text-sm font-medium">{{ e.title }}</p>
+                            <p class="mt-1 text-sm font-medium">
+                                {{ e.title }}
+                            </p>
                             <p
                                 v-if="e.detail"
                                 class="mt-0.5 text-sm whitespace-pre-line text-muted-foreground"
                             >
                                 {{ e.detail }}
                             </p>
-                            <p v-if="e.by" class="mt-1 text-xs text-muted-foreground/80">
+                            <p
+                                v-if="e.by"
+                                class="mt-1 text-xs text-muted-foreground/80"
+                            >
                                 {{ e.by }}
                             </p>
                         </div>

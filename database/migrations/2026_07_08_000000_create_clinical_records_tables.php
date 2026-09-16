@@ -44,6 +44,9 @@ return new class extends Migration
             $table->string('name');                          // e.g. Hypertension
             $table->string('code')->nullable();              // ICD-10
             $table->string('status')->default('active');     // active | chronic | resolved
+            // Whether the diagnosis is still a working one (provisional) or
+            // has been confirmed. HIM coding worklists pick up provisionals.
+            $table->string('certainty', 12)->default('confirmed'); // provisional | confirmed
             $table->date('onset_date')->nullable();
             $table->date('resolved_date')->nullable();
             $table->text('notes')->nullable();

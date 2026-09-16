@@ -14,6 +14,8 @@ enum StockMovementType: string
     case Return = 'return';             // stock returned into store
     case TransferOut = 'transfer_out';  // left a location on a requisition
     case TransferIn = 'transfer_in';    // arrived at a location on a requisition
+    case Disposal = 'disposal';         // expired or damaged stock destroyed
+    case Count = 'count';               // variance found at a physical count
 
     /**
      * Human-readable label.
@@ -27,6 +29,8 @@ enum StockMovementType: string
             self::Return => 'Return',
             self::TransferOut => 'Transfer out',
             self::TransferIn => 'Transfer in',
+            self::Disposal => 'Disposal',
+            self::Count => 'Physical count',
         };
     }
 

@@ -8,6 +8,7 @@ use App\Enums\EncounterType;
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\HasPublicId;
 use App\Models\Contracts\AuditableRecord;
+use Carbon\CarbonInterface;
 use Database\Factories\EncounterFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -46,6 +47,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'patient_id', 'visit_id', 'queue_entry_id', 'admission_id', 'service_point_id', 'author_id',
+    'entered_by', 'entered_at', 'encounter_at',
     'type', 'status',
     'presenting_complaint', 'subjective', 'objective', 'assessment', 'plan', 'structured',
     'outcome', 'follow_up_at', 'started_at', 'signed_at',
@@ -77,7 +79,39 @@ class Encounter extends Model implements AuditableRecord
             'follow_up_at' => 'datetime',
             'started_at' => 'datetime',
             'signed_at' => 'datetime',
+            'entered_at' => 'datetime',
+            'encounter_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The clinical date of the contact: the backdated date when one was
+     * given, otherwise when the record was opened.
+     */
+    public function clinicalDate(): ?CarbonInterface
+    {
+        return $this->encounter_at ?? $this->started_at;
+    }
+
+    /**
+     * Whether the note was entered on a later day than the contact it
+     * documents (retrospective entry from paper).
+     */
+    public function isBackdated(): bool
+    {
+        return $this->encounter_at !== null
+            && $this->started_at !== null
+            && $this->encounter_at->toDateString() < $this->started_at->toDateString();
+    }
+
+    /**
+     * The member of staff who typed the note, when not the provider.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function enteredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'entered_by');
     }
 
     /**
@@ -200,6 +234,30 @@ class Encounter extends Model implements AuditableRecord
     public function observationSets(): HasMany
     {
         return $this->hasMany(ObservationSet::class)->latest('recorded_at')->latest('id');
+    }
+
+    /**
+     * Clinical forms filled on the encounter, in the order they were started.
+     *
+     * @return HasMany<FormSubmission, $this>
+     */
+    public function formSubmissions(): HasMany
+    {
+        return $this->hasMany(FormSubmission::class)->orderBy('id');
+    }
+
+    /**
+     * The forms an encounter summary lists: live submissions carrying what
+     * the summary names. Eager-load this on summaries rather than
+     * formSubmissions() so voided forms stay out of the history.
+     *
+     * @return HasMany<FormSubmission, $this>
+     */
+    public function summaryFormSubmissions(): HasMany
+    {
+        return $this->formSubmissions()
+            ->live()
+            ->with(['form:id,slug,name', 'version:id,version', 'filledBy:id,name', 'completedBy:id,name']);
     }
 
     /**

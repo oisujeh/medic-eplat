@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
+use App\Enums\StaffCadre;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,9 @@ class StoreUserRequest extends FormRequest
     {
         return [
             ...$this->profileRules(),
+            'cadre' => ['nullable', Rule::enum(StaffCadre::class)],
+            'registration_number' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'max:30'],
             'password' => $this->passwordRules(),
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => [Rule::exists('roles', 'id')],

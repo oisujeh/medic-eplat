@@ -24,6 +24,14 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        // Where each member of staff works: the service points they are
+        // posted to, for pickers and, later, per-point session rules.
+        Schema::create('service_point_user', function (Blueprint $table) {
+            $table->foreignId('service_point_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->primary(['service_point_id', 'user_id']);
+        });
+
         // A clinical pathway as data: which service points a visit moves
         // through, where it may start, and which steps may follow which.
         // OPD, emergency, antenatal and immunization are seeded; a facility
@@ -121,6 +129,7 @@ return new class extends Migration
         Schema::dropIfExists('workflow_transitions');
         Schema::dropIfExists('workflow_stages');
         Schema::dropIfExists('workflows');
+        Schema::dropIfExists('service_point_user');
         Schema::dropIfExists('service_points');
     }
 };

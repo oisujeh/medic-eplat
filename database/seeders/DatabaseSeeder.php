@@ -28,6 +28,8 @@ class DatabaseSeeder extends Seeder
             StockLocationsSeeder::class,
             PharmacyStockSeeder::class,
             TerminologySeeder::class,
+            FormsSeeder::class,
+            DataQualityRulesSeeder::class,
             SuperAdminSeeder::class,
         ]);
     }

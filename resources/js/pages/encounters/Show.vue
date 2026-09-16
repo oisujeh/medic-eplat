@@ -9,6 +9,7 @@ import EncounterSidebar from '@/components/encounter/EncounterSidebar.vue';
 import EncounterStepper from '@/components/encounter/EncounterStepper.vue';
 import type { Stage } from '@/components/encounter/EncounterStepper.vue';
 import EncounterTimeline from '@/components/encounter/EncounterTimeline.vue';
+import FormsPanel from '@/components/encounter/FormsPanel.vue';
 import PatientBanner from '@/components/encounter/PatientBanner.vue';
 import AssessmentStage from '@/components/encounter/stages/AssessmentStage.vue';
 import ExaminationStage from '@/components/encounter/stages/ExaminationStage.vue';
@@ -41,6 +42,7 @@ import type {
     TimelineKindOption,
     ServicePointOption,
 } from '@/types/clinical';
+import type { AvailableForm, FormSubmissionSummary } from '@/types/forms';
 
 const props = defineProps<{
     encounter: Encounter;
@@ -63,7 +65,14 @@ const props = defineProps<{
     onwardServicePoints: ServicePointOption[];
     priorities: Option[];
     outcomes: Option[];
-    can: { document: boolean; sign: boolean; addend: boolean };
+    providers: Array<{ id: number; name: string }>;
+    forms: { submissions: FormSubmissionSummary[]; available: AvailableForm[] };
+    can: {
+        document: boolean;
+        sign: boolean;
+        addend: boolean;
+        backdate: boolean;
+    };
 }>();
 
 const isConsultation = props.encounter.type === 'consultation';
@@ -245,6 +254,11 @@ const backLabel = isConsultation ? 'Back to clinical' : 'Back to nursing';
                     </Button>
                 </div>
 
+                <FormsPanel
+                    :submissions="forms.submissions"
+                    :available="forms.available"
+                />
+
                 <AddendaPanel
                     v-if="!encounter.is_open"
                     :addenda="addenda"
@@ -255,7 +269,9 @@ const backLabel = isConsultation ? 'Back to clinical' : 'Back to nursing';
                 <DispositionBar
                     :onward-service-points="onwardServicePoints"
                     :priorities="priorities"
+                    :providers="providers"
                     :can-sign="can.sign"
+                    :can-backdate="can.backdate"
                 />
             </div>
 

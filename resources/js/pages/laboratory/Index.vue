@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { FlaskConical, Search } from '@lucide/vue';
+import { BookOpen, FlaskConical, Search } from '@lucide/vue';
 import { ref } from 'vue';
 import { Input } from '@/components/ui/input';
 import {
@@ -109,11 +109,22 @@ function priorityClass(priority: string): string {
     <Head title="Laboratory" />
 
     <div class="flex h-full flex-1 flex-col gap-5 p-4">
-        <div>
-            <h1 class="text-2xl font-semibold tracking-tight">Laboratory</h1>
-            <p class="mt-1 text-sm text-muted-foreground">
-                Specimen processing and result verification worklist.
-            </p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-semibold tracking-tight">
+                    Laboratory
+                </h1>
+                <p class="mt-1 text-sm text-muted-foreground">
+                    Specimen processing and result verification worklist.
+                </p>
+            </div>
+            <Link
+                href="/laboratory/catalogue"
+                class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+            >
+                <BookOpen class="size-4" />
+                Test catalogue
+            </Link>
         </div>
 
         <!-- Filters -->
@@ -241,9 +252,7 @@ function priorityClass(priority: string): string {
                         >
                     </div>
                     <span class="text-xs text-muted-foreground">
-                        {{ order.resulted_count }}/{{
-                            order.test_count
-                        }}
+                        {{ order.resulted_count }}/{{ order.test_count }}
                         resulted
                         <span v-if="order.ordered_ago"
                             >· ordered {{ order.ordered_ago }}</span

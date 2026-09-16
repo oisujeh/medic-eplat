@@ -120,6 +120,11 @@ class RolesAndModulesSeeder extends Seeder
             'roles' => ['chief-medical-director'],
         ],
         [
+            'slug' => 'data-quality', 'name' => 'Data Quality', 'icon' => 'BadgeCheck',
+            'href' => '/data-quality', 'sort_order' => 85,
+            'roles' => ['chief-medical-director', 'records-officer', 'physician', 'nurse', 'laboratory-staff', 'cashier'],
+        ],
+        [
             'slug' => 'administration', 'name' => 'Administration', 'icon' => 'ShieldCheck',
             'href' => '/admin/users', 'sort_order' => 90,
             'roles' => [],

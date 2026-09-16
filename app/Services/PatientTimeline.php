@@ -9,6 +9,7 @@ use App\Models\Delivery;
 use App\Models\Dispense;
 use App\Models\DispenseItem;
 use App\Models\Encounter;
+use App\Models\FormSubmission;
 use App\Models\Immunization;
 use App\Models\LabOrder;
 use App\Models\LabResult;
@@ -72,6 +73,7 @@ class PatientTimeline
         return collect()
             ->merge($this->registration($patient))
             ->merge($this->encounters($patient))
+            ->merge($this->forms($patient))
             ->merge($this->diagnoses($patient))
             ->merge($this->observations($patient))
             ->merge($this->laboratory($patient))
@@ -124,6 +126,33 @@ class PatientTimeline
                 href: route('encounters.show', $e),
                 by: $e->author?->name,
                 key: 'encounter:'.$e->id,
+            ))
+            ->all();
+    }
+
+    /**
+     * Clinical forms filled for the patient: completed ones dated when they
+     * were completed, drafts flagged as still in progress. Voided forms are
+     * not history.
+     *
+     * @return array<int, TimelineEntry>
+     */
+    private function forms(Patient $patient): array
+    {
+        return $patient->formSubmissions()
+            ->live()
+            ->with(['form:id,name', 'version:id,version', 'filledBy:id,name', 'completedBy:id,name'])
+            ->get()
+            ->map(fn (FormSubmission $s) => new TimelineEntry(
+                kind: TimelineKind::Form,
+                at: $s->completed_at ?? $s->last_saved_at ?? $s->started_at,
+                title: $s->form->name,
+                detail: $s->version ? 'Version '.$s->version->version.' · '.$s->entry_mode->label() : null,
+                badge: $s->isCompleted() ? null : 'Draft',
+                tone: $s->isCompleted() ? 'muted' : 'amber',
+                href: route('forms.show', $s),
+                by: ($s->completedBy ?? $s->filledBy)?->name,
+                key: 'form_submission:'.$s->id,
             ))
             ->all();
     }

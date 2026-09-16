@@ -74,7 +74,11 @@ const active = computed(() =>
 </script>
 
 <template>
-    <div ref="container" class="relative w-full" @pointerleave="hoverIndex = null">
+    <div
+        ref="container"
+        class="relative w-full"
+        @pointerleave="hoverIndex = null"
+    >
         <svg :width="width" :height="height" class="block overflow-visible">
             <!-- gridlines -->
             <line
@@ -99,7 +103,9 @@ const active = computed(() =>
                 :height="Math.max(0, b.height)"
                 rx="3"
                 :fill="color"
-                :fill-opacity="hoverIndex === null || hoverIndex === i ? 0.9 : 0.35"
+                :fill-opacity="
+                    hoverIndex === null || hoverIndex === i ? 0.9 : 0.35
+                "
                 @pointerenter="hoverIndex = i"
             />
         </svg>
@@ -109,7 +115,7 @@ const active = computed(() =>
             <span
                 v-for="(g, i) in gridlines"
                 :key="i"
-                class="absolute left-0 -translate-y-1/2 bg-card/70 pr-1 text-[10px] tabular-nums text-muted-foreground"
+                class="absolute left-0 -translate-y-1/2 bg-card/70 pr-1 text-[10px] text-muted-foreground tabular-nums"
                 :style="{ top: `${g.y}px` }"
                 >{{ format(g.value) }}</span
             >

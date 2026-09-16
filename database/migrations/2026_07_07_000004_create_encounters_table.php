@@ -36,7 +36,16 @@ return new class extends Migration
             $table->foreignId('visit_id')->constrained()->cascadeOnDelete();
             $table->foreignId('queue_entry_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('service_point_id')->nullable()->constrained()->nullOnDelete();
+            // The provider responsible for the contact: the clinician or
+            // nurse whose name the note carries.
             $table->foreignId('author_id')->nullable()->constrained('users')->nullOnDelete();
+            // Who typed it and when. Differs from the provider and the
+            // clinical date when a clerk enters a paper note later.
+            $table->foreignId('entered_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('entered_at')->nullable();
+            // The clinical date of the contact; started_at is when the
+            // record was opened. Backdating needs a permission.
+            $table->timestamp('encounter_at')->nullable()->index();
 
             $table->string('type', 30);                            // EncounterType
             $table->string('status', 20)->default('in_progress');  // EncounterStatus

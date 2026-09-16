@@ -90,12 +90,16 @@ watch(() => ({ ...props.details }), lookup, { deep: true });
     >
         <p class="flex items-center gap-2 text-sm font-medium">
             <AlertTriangle class="size-4 text-amber-600" />
-            {{ candidates.length === 1 ? 'A patient' : candidates.length + ' patients' }}
+            {{
+                candidates.length === 1
+                    ? 'A patient'
+                    : candidates.length + ' patients'
+            }}
             on the register may be this person
         </p>
         <p class="mt-1 text-xs text-muted-foreground">
-            Check before registering again. Opening a record does not lose
-            what you have typed here.
+            Check before registering again. Opening a record does not lose what
+            you have typed here.
         </p>
         <ul class="mt-3 flex flex-col divide-y divide-border">
             <li
@@ -119,8 +123,8 @@ watch(() => ({ ...props.details }), lookup, { deep: true });
                     <span class="text-xs text-muted-foreground">
                         <span class="font-mono">{{ c.file_number }}</span>
                         · {{ c.age !== null ? c.age + 'y ' : '' }}{{ c.sex
-                        }}{{ c.lga ? ' · ' + c.lga : '' }}
-                        · {{ c.reasons.join(', ') }}
+                        }}{{ c.lga ? ' · ' + c.lga : '' }} ·
+                        {{ c.reasons.join(', ') }}
                     </span>
                 </div>
                 <Link

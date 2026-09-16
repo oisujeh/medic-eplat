@@ -67,7 +67,9 @@ watchDebounced(
                 <h1 class="text-2xl font-semibold tracking-tight">Patients</h1>
                 <p class="mt-1 text-sm text-muted-foreground">
                     {{ props.patients.total }}
-                    registered patient{{ props.patients.total === 1 ? '' : 's' }}
+                    registered patient{{
+                        props.patients.total === 1 ? '' : 's'
+                    }}
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
@@ -150,13 +152,18 @@ watchDebounced(
                                 </div>
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
-                                {{ p.sex }}{{ p.age !== null ? ' · ' + p.age + 'y' : '' }}
+                                {{ p.sex
+                                }}{{
+                                    p.age !== null ? ' · ' + p.age + 'y' : ''
+                                }}
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
                                 {{ p.phone ?? '—' }}
                             </td>
                             <td class="px-4 py-3">
-                                <span v-if="p.state">{{ p.lga }}, {{ p.state }}</span>
+                                <span v-if="p.state"
+                                    >{{ p.lga }}, {{ p.state }}</span
+                                >
                                 <span v-else>—</span>
                             </td>
                             <td class="px-4 py-3">
@@ -168,7 +175,9 @@ watchDebounced(
                                             : 'bg-muted text-muted-foreground'
                                     "
                                 >
-                                    {{ p.coverage === 'hmo' ? 'HMO' : 'Private' }}
+                                    {{
+                                        p.coverage === 'hmo' ? 'HMO' : 'Private'
+                                    }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
@@ -199,7 +208,9 @@ watchDebounced(
             class="flex flex-wrap items-center justify-between gap-3"
         >
             <p class="text-xs text-muted-foreground">
-                Showing {{ props.patients.from ?? 0 }}–{{ props.patients.to ?? 0 }}
+                Showing {{ props.patients.from ?? 0 }}–{{
+                    props.patients.to ?? 0
+                }}
                 of {{ props.patients.total }}
             </p>
             <div class="flex flex-wrap gap-1">

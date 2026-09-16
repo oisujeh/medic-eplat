@@ -13,6 +13,7 @@ enum IdentifierType: string
     case Nin = 'nin';
     case Phone = 'phone';
     case HmoNumber = 'hmo_number';
+    case NhiaNumber = 'nhia_number';
     case NationalHealthId = 'national_health_id';
     case PreviousFileNumber = 'previous_file_number';
 
@@ -23,6 +24,7 @@ enum IdentifierType: string
             self::Nin => 'NIN',
             self::Phone => 'Phone',
             self::HmoNumber => 'HMO / enrollee number',
+            self::NhiaNumber => 'NHIA number',
             self::NationalHealthId => 'National health ID',
             self::PreviousFileNumber => 'Previous file number',
         };
@@ -34,7 +36,7 @@ enum IdentifierType: string
     public function isUnique(): bool
     {
         return match ($this) {
-            self::FileNumber, self::Nin, self::NationalHealthId => true,
+            self::FileNumber, self::Nin, self::NhiaNumber, self::NationalHealthId => true,
             self::Phone, self::HmoNumber, self::PreviousFileNumber => false,
         };
     }

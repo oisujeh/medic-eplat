@@ -25,6 +25,9 @@ class TerminologySeeder extends Seeder
     protected array $sources = [
         ['LOCAL', 'Facility local codes', null, null],
         ['ICD10', 'ICD-10 (WHO)', '2019', 'https://icd.who.int/browse10/2019/en'],
+        // Carried as a mapping on ICD-10 codes via the WHO crosswalk; never
+        // the stored diagnosis code (PRD ENC-05, decision of 13 Sep 2026).
+        ['ICD11', 'ICD-11 MMS (WHO)', '2025-01', 'https://icd.who.int/browse/2025-01/mms/en'],
         ['LOINC', 'LOINC', '2.78', 'https://loinc.org'],
         ['NEML', 'Nigeria Essential Medicines List', '2020', 'https://health.gov.ng'],
     ];

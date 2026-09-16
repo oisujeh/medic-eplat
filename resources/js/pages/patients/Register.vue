@@ -26,6 +26,7 @@ const props = defineProps<{
         sexes: Record<string, string>;
         maritalStatuses: string[];
         nokRelationships: string[];
+        phoneOwners: string[];
         coverages: Record<string, string>;
         hmoProviders: string[];
         payers: Array<{ id: number; name: string; type_label: string }>;
@@ -61,6 +62,12 @@ const form = useForm({
     marital_status: '',
     nin: '',
     phone: '',
+    phone_owner: 'self',
+    phone_alternate: '',
+    sms_consent: false,
+    registered_at: '',
+    is_restricted: false,
+    restricted_reason: '',
     email: '',
     address: '',
     nationality: 'Nigerian',
@@ -343,6 +350,59 @@ function submit() {
                         </div>
 
                         <div class="grid gap-1.5">
+                            <Label for="phone_owner">Whose phone is it?</Label>
+                            <Select v-model="form.phone_owner">
+                                <SelectTrigger id="phone_owner" class="w-full">
+                                    <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="o in options.phoneOwners"
+                                        :key="o"
+                                        :value="o"
+                                        class="capitalize"
+                                        >{{ o }}</SelectItem
+                                    >
+                                </SelectContent>
+                            </Select>
+                            <InputError :message="form.errors.phone_owner" />
+                        </div>
+
+                        <div class="grid gap-1.5">
+                            <Label for="phone_alternate">Alternate phone</Label>
+                            <Input
+                                id="phone_alternate"
+                                v-model="form.phone_alternate"
+                                autocomplete="off"
+                                placeholder="optional"
+                            />
+                            <InputError
+                                :message="form.errors.phone_alternate"
+                            />
+                        </div>
+
+                        <label
+                            class="flex items-start gap-2 pt-1 text-sm sm:col-span-2 lg:col-span-3"
+                        >
+                            <Checkbox
+                                id="sms_consent"
+                                :model-value="form.sms_consent"
+                                @update:model-value="
+                                    (v) => (form.sms_consent = v === true)
+                                "
+                            />
+                            <span>
+                                Patient agrees to SMS reminders
+                                <span
+                                    class="block text-xs text-muted-foreground"
+                                >
+                                    Only appointment reminders; never a
+                                    diagnosis or programme name.
+                                </span>
+                            </span>
+                        </label>
+
+                        <div class="grid gap-1.5">
                             <Label for="email">Email</Label>
                             <Input
                                 id="email"
@@ -362,6 +422,61 @@ function submit() {
                                 autocomplete="off"
                             />
                             <InputError :message="form.errors.nationality" />
+                        </div>
+
+                        <div class="grid gap-1.5">
+                            <Label for="registered_at"
+                                >Date registered (paper register)</Label
+                            >
+                            <Input
+                                id="registered_at"
+                                v-model="form.registered_at"
+                                type="date"
+                                :max="new Date().toISOString().slice(0, 10)"
+                            />
+                            <p class="text-xs text-muted-foreground">
+                                Leave blank for today. Set it when entering an
+                                old folder so the register keeps its date.
+                            </p>
+                            <InputError :message="form.errors.registered_at" />
+                        </div>
+
+                        <div
+                            class="grid gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 sm:col-span-2 lg:col-span-3 dark:border-amber-900/50 dark:bg-amber-950/20"
+                        >
+                            <label class="flex items-start gap-2 text-sm">
+                                <Checkbox
+                                    id="is_restricted"
+                                    :model-value="form.is_restricted"
+                                    @update:model-value="
+                                        (v) => (form.is_restricted = v === true)
+                                    "
+                                />
+                                <span>
+                                    Restrict this record
+                                    <span
+                                        class="block text-xs text-muted-foreground"
+                                    >
+                                        Staff without the permission must log a
+                                        reason to open it. Use for VIPs, staff
+                                        members and other sensitive cases.
+                                    </span>
+                                </span>
+                            </label>
+                            <div v-if="form.is_restricted" class="grid gap-1.5">
+                                <Label for="restricted_reason"
+                                    >Why is it restricted? *</Label
+                                >
+                                <Input
+                                    id="restricted_reason"
+                                    v-model="form.restricted_reason"
+                                    autocomplete="off"
+                                    placeholder="e.g. Staff member"
+                                />
+                                <InputError
+                                    :message="form.errors.restricted_reason"
+                                />
+                            </div>
                         </div>
 
                         <div class="grid gap-1.5 sm:col-span-2">

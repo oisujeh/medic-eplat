@@ -66,7 +66,10 @@ class DashboardService
         'outstanding', 'admitted_now', 'bed_occupancy', 'low_stock',
     ];
 
-    public function __construct(private readonly ReportService $reports) {}
+    public function __construct(
+        private readonly ReportService $reports,
+        private readonly DataQuality $dataQuality,
+    ) {}
 
     /**
      * Build the home payload for a user.
@@ -92,7 +95,7 @@ class DashboardService
                 'claims' => $has('claims') ? $this->claims() : null,
                 'management' => $has('reports') ? $this->management() : null,
             ],
-            'alerts' => $this->alerts($modules),
+            'alerts' => $this->alerts($user, $modules),
         ];
     }
 
@@ -505,7 +508,7 @@ class DashboardService
      * @param  array<int, string>  $modules
      * @return list<array<string, mixed>>
      */
-    private function alerts(array $modules): array
+    private function alerts(User $user, array $modules): array
     {
         $has = fn (string ...$slugs): bool => array_intersect($slugs, $modules) !== [];
         $alerts = [];
@@ -566,6 +569,11 @@ class DashboardService
         if ($has('registration')) {
             $duplicates = PatientMatchCandidate::query()->pending()->count();
             $alert('possible_duplicates', 'Possible duplicate records', 'Record pairs to merge or dismiss', $duplicates, 'amber', '/patients/duplicates');
+        }
+
+        if ($has('data-quality')) {
+            $outstanding = $this->dataQuality->outstandingFor($user);
+            $alert('data_quality_issues', 'Data quality issues to clear', 'Records failing a rule you are answerable for', $outstanding['total'], $outstanding['critical'] > 0 ? 'red' : 'amber', '/data-quality?owner=mine');
         }
 
         if ($has('inventory', 'pharmacy')) {

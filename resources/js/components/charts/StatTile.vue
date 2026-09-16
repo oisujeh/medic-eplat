@@ -15,7 +15,9 @@ const props = withDefaults(
     { delta: null, invertDelta: false, sub: null, icon: null },
 );
 
-const hasDelta = computed(() => props.delta !== null && Number.isFinite(props.delta));
+const hasDelta = computed(
+    () => props.delta !== null && Number.isFinite(props.delta),
+);
 
 // Positive movement is good by default; for cost-like metrics, invert.
 const isGood = computed(() => {

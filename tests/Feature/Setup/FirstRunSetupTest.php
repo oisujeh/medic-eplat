@@ -42,6 +42,37 @@ function facilityProfile(array $overrides = []): array
     ];
 }
 
+test('the wizard captures profile, numbering and the billing switch', function () {
+    $admin = setupUserWithRole('super-administrator');
+
+    $this->actingAs($admin)
+        ->get(route('setup.show'))
+        ->assertInertia(fn ($page) => $page->has('options.levels', 3)->has('options.tierProfiles', 4));
+
+    $this->actingAs($admin)
+        ->post(route('setup.store'), facilityProfile([
+            'level' => 'primary',
+            'ownership' => 'public',
+            'tier_profile' => 'phc',
+            'patient_number_prefix' => 'ikphc',
+            'patient_number_check_digit' => true,
+            'billing_enabled' => false,
+        ]))
+        ->assertRedirect(route('dashboard', absolute: false));
+
+    $profile = app(FacilitySettings::class)->profile();
+
+    expect($profile)->toMatchArray([
+        'level' => 'primary',
+        'ownership' => 'public',
+        'tier_profile' => 'phc',
+        'patient_number_prefix' => 'IKPHC',
+        'patient_number_check_digit' => true,
+        'billing_enabled' => false,
+        'name' => 'Ikeja General Hospital',
+    ])->and($profile['completed_at'])->not->toBeNull();
+});
+
 test('the login screen still renders before setup', function () {
     $this->get(route('login'))->assertOk();
 });

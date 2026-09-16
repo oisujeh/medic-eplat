@@ -10,7 +10,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * A past encounter as it appears on a timeline: who, when, what was found
  * and what was planned. Expects `author`, `servicePoint` and
- * `codedDiagnoses` to be loaded; `addenda` is included when loaded.
+ * `codedDiagnoses` to be loaded; `addenda` and `summaryFormSubmissions`
+ * are included when loaded.
  *
  * @mixin Encounter
  */
@@ -44,6 +45,7 @@ class EncounterSummaryResource extends JsonResource
                 ->values(),
             'outcome' => $this->outcome?->label(),
             'addenda' => EncounterAddendumResource::collection($this->whenLoaded('addenda')),
+            'forms' => FormSubmissionSummaryResource::collection($this->whenLoaded('summaryFormSubmissions')),
             'url' => route('encounters.show', $this->id),
         ];
     }

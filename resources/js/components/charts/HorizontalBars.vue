@@ -27,9 +27,11 @@ const max = computed(() => Math.max(1, ...props.items.map((i) => i.value)));
             :key="item.label"
             class="flex items-center gap-3 text-sm"
         >
-            <span class="w-28 shrink-0 truncate text-muted-foreground" :title="item.label">{{
-                item.label
-            }}</span>
+            <span
+                class="w-28 shrink-0 truncate text-muted-foreground"
+                :title="item.label"
+                >{{ item.label }}</span
+            >
             <div class="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
                     class="h-full rounded-full transition-[width] duration-500"
@@ -43,7 +45,10 @@ const max = computed(() => Math.max(1, ...props.items.map((i) => i.value)));
                 format(item.value)
             }}</span>
         </li>
-        <li v-if="!items.length" class="py-4 text-center text-sm text-muted-foreground">
+        <li
+            v-if="!items.length"
+            class="py-4 text-center text-sm text-muted-foreground"
+        >
             No data in this period.
         </li>
     </ul>

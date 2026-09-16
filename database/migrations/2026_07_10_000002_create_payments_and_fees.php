@@ -17,9 +17,12 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('bill_id')->constrained()->cascadeOnDelete();
+            // The facility's own receipt number, issued from its series so
+            // a reprint always shows the same number.
+            $table->string('receipt_number', 30)->nullable()->unique();
             $table->decimal('amount', 12, 2);
             $table->string('method')->default('cash');    // App\Enums\PaymentMethod
-            $table->string('reference')->nullable();       // txn / receipt reference
+            $table->string('reference')->nullable();       // txn reference for non-cash payments
             $table->foreignId('received_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 

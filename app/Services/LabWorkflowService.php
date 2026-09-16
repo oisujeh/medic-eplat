@@ -227,6 +227,15 @@ class LabWorkflowService
      */
     private function addResultLine(LabOrder $order, Patient $patient, User $orderedBy, LabTest $analyte): void
     {
+        // The limits for this patient's age and sex are copied onto the line,
+        // so a later change to the catalogue never re-flags an old result.
+        $range = $analyte->rangeFor(
+            $patient->date_of_birth?->diffInDays(now(), absolute: true) !== null
+                ? (int) $patient->date_of_birth->diffInDays(now(), absolute: true)
+                : null,
+            $patient->sex,
+        );
+
         $order->results()->create([
             'lab_test_id' => $analyte->id,
             'catalogue_version_id' => $analyte->currentVersion()->id,
@@ -238,11 +247,33 @@ class LabWorkflowService
             'code' => $analyte->code,
             'department' => $analyte->department->value,
             'unit' => $analyte->unit,
-            'reference_range' => $analyte->referenceLabel(),
-            'reference_low' => $analyte->reference_low,
-            'reference_high' => $analyte->reference_high,
+            'reference_range' => $this->referenceLabel($range, $analyte),
+            'reference_low' => $range['low'],
+            'reference_high' => $range['high'],
+            'critical_low' => $range['critical_low'],
+            'critical_high' => $range['critical_high'],
             'specimen' => $analyte->specimen_type,
             'status' => LabResult::STATUS_PENDING,
         ]);
+    }
+
+    /**
+     * The printed form of the limits that apply, e.g. "11.5 – 16.5 g/dL".
+     *
+     * @param  array{low: float|null, high: float|null, critical_low: float|null, critical_high: float|null, text: string|null}  $range
+     */
+    private function referenceLabel(array $range, LabTest $analyte): ?string
+    {
+        if ($range['low'] === null && $range['high'] === null) {
+            return $range['text'] ?? $analyte->referenceLabel();
+        }
+
+        $unit = $analyte->unit ? " {$analyte->unit}" : '';
+
+        return match (true) {
+            $range['low'] !== null && $range['high'] !== null => rtrim(rtrim(number_format($range['low'], 3, '.', ''), '0'), '.').' – '.rtrim(rtrim(number_format($range['high'], 3, '.', ''), '0'), '.').$unit,
+            $range['low'] !== null => '≥ '.rtrim(rtrim(number_format($range['low'], 3, '.', ''), '0'), '.').$unit,
+            default => '≤ '.rtrim(rtrim(number_format((float) $range['high'], 3, '.', ''), '0'), '.').$unit,
+        };
     }
 }

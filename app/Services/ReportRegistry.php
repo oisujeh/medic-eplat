@@ -46,6 +46,7 @@ class ReportRegistry
         private readonly NhmisReports $nhmis,
         private readonly SurveillanceReports $surveillance,
         private readonly StockReorder $reorder,
+        private readonly DataQualityReports $dataQuality,
     ) {}
 
     /**
@@ -68,6 +69,7 @@ class ReportRegistry
             'maternity' => ['name' => 'Maternity', 'icon' => 'Baby', 'description' => 'Delivery and birth registers.'],
             'nhmis' => ['name' => 'NHMIS returns', 'icon' => 'ClipboardList', 'description' => 'Monthly summary figures for the DHIS2 return. Pick "Last month" as the range.'],
             'surveillance' => ['name' => 'IDSR surveillance', 'icon' => 'Radar', 'description' => 'Notifiable disease cases for the DSNO: the line list and the weekly summary.'],
+            'data-quality' => ['name' => 'Data quality', 'icon' => 'BadgeCheck', 'description' => 'What the register gets wrong, and how much of it each rule catches.'],
         ];
     }
 
@@ -124,7 +126,30 @@ class ReportRegistry
 
             ['key' => 'idsr-line-list', 'name' => 'IDSR: Case Line List', 'category' => 'surveillance', 'description' => 'One row per notifiable disease case detected in the period, with patient contact details, classification, outcome and DSNO notification.', 'icon' => 'Radar', 'type' => 'table', 'featured' => true],
             ['key' => 'idsr-weekly-summary', 'name' => 'IDSR: Weekly Summary', 'category' => 'surveillance', 'description' => 'Cases, confirmed cases and deaths per priority disease for the IDSR 002 return. Pick a single week as the range.', 'icon' => 'ClipboardList', 'type' => 'table', 'featured' => false],
+
+            ['key' => 'dq-rule-scorecard', 'name' => 'Data Quality Scorecard', 'category' => 'data-quality', 'description' => 'Every rule with the share of the records it judges that pass it, worst first.', 'icon' => 'BadgeCheck', 'type' => 'table', 'featured' => true],
+            ['key' => 'dq-issue-register', 'name' => 'Data Quality Issue Register', 'category' => 'data-quality', 'description' => 'Every issue raised within the period, what was wrong and whether it was put right.', 'icon' => 'ListChecks', 'type' => 'table', 'featured' => false],
         ];
+    }
+
+    /**
+     * Reports that list patients one per row. Exporting these is a
+     * permission in its own right (PRD RPT-05); aggregates are not.
+     *
+     * @var list<string>
+     */
+    public const LINE_LISTS = [
+        'patient-register', 'consultations-log', 'referral-register', 'lab-orders', 'lab-turnaround',
+        'dispensing-log', 'prescription-fulfilment', 'appointments-log', 'no-shows', 'admissions-log',
+        'claims-register', 'delivery-register', 'birth-register', 'idsr-line-list', 'dq-issue-register',
+    ];
+
+    /**
+     * Whether a report is a patient-level line list.
+     */
+    public function isLineList(string $key): bool
+    {
+        return in_array($key, self::LINE_LISTS, true);
     }
 
     /**
@@ -179,6 +204,8 @@ class ReportRegistry
             'nhmis-inpatient' => $this->nhmis->inpatient($from, $to),
             'nhmis-mch' => $this->nhmis->maternalChildHealth($from, $to),
             'nhmis-laboratory' => $this->nhmis->laboratory($from, $to),
+            'dq-issue-register' => $this->dataQuality->issueRegister($from, $to),
+            'dq-rule-scorecard' => $this->dataQuality->ruleScorecard($from, $to),
             'idsr-line-list' => $this->surveillance->lineList($from, $to),
             'idsr-weekly-summary' => $this->surveillance->weeklySummary($from, $to),
             default => ['columns' => [], 'rows' => [], 'summary' => []],

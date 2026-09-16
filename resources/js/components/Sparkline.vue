@@ -39,7 +39,10 @@ const area = computed(() => {
     const first = coords.value[0];
     const last = coords.value[coords.value.length - 1];
     const path = coords.value
-        .map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`)
+        .map(
+            (c, i) =>
+                `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`,
+        )
         .join(' ');
     return `${path} L ${last.x.toFixed(1)} ${base} L ${first.x.toFixed(1)} ${base} Z`;
 });

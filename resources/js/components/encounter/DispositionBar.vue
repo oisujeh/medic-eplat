@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { CheckCircle2, Save } from '@lucide/vue';
 import { computed, watch } from 'vue';
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,8 +22,14 @@ import type { Option, ServicePointOption } from '@/types/clinical';
 const props = defineProps<{
     onwardServicePoints: ServicePointOption[];
     priorities: Option[];
+    /** Clinical staff who may be named as the provider of the note. */
+    providers: Array<{ id: number; name: string }>;
     canSign: boolean;
+    /** Whether the signer may date the contact earlier than today. */
+    canBackdate: boolean;
 }>();
+
+const today = new Date().toISOString().slice(0, 10);
 
 const { encounter, form, readOnly, saveDraft, sign } = useEncounterContext();
 
@@ -143,6 +150,52 @@ const signLabel = computed(() => `Sign ${encounter.type_label.toLowerCase()}`);
                     v-model="form.next_note"
                     placeholder="Reason for onward routing"
                 />
+            </div>
+        </div>
+
+        <div class="border-t border-border pt-4">
+            <h3 class="text-sm font-semibold">Attribution</h3>
+            <p class="text-xs text-muted-foreground">
+                Leave as is when you saw the patient today. Entering a note from
+                paper? Name the clinician and the date they saw the patient.
+            </p>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                <div class="grid gap-1.5">
+                    <Label>Seen by</Label>
+                    <Select v-model="form.provider_id">
+                        <SelectTrigger class="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent class="max-h-72">
+                            <SelectItem value="self"
+                                >Me (the signer)</SelectItem
+                            >
+                            <SelectItem
+                                v-for="p in providers"
+                                :key="p.id"
+                                :value="String(p.id)"
+                                >{{ p.name }}</SelectItem
+                            >
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="form.errors.provider_id" />
+                </div>
+                <div class="grid gap-1.5">
+                    <Label>Date seen</Label>
+                    <Input
+                        v-model="form.encounter_at"
+                        type="date"
+                        :max="today"
+                        :disabled="!canBackdate"
+                    />
+                    <p
+                        v-if="!canBackdate"
+                        class="text-xs text-muted-foreground"
+                    >
+                        Backdating needs the records officer permission.
+                    </p>
+                    <InputError :message="form.errors.encounter_at" />
+                </div>
             </div>
         </div>
 

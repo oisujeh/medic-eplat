@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { ChevronDown, HeartPulse, Stethoscope } from '@lucide/vue';
+import { ChevronDown, FileText, HeartPulse, Stethoscope } from '@lucide/vue';
 import { ref } from 'vue';
 import type { EncounterSummary } from '@/types/clinical';
 
@@ -164,6 +164,35 @@ const sections = (e: EncounterSummary) =>
                         <p class="text-sm whitespace-pre-line">{{ a.body }}</p>
                     </li>
                 </ol>
+                <ul v-if="e.forms?.length" class="flex flex-col gap-1.5">
+                    <li
+                        v-for="f in e.forms"
+                        :key="f.id"
+                        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm"
+                    >
+                        <FileText
+                            class="size-3.5 shrink-0 text-muted-foreground"
+                        />
+                        <Link
+                            :href="f.url"
+                            class="font-medium hover:underline"
+                            >{{ f.form_name }}</Link
+                        >
+                        <span class="text-xs text-muted-foreground"
+                            >v{{ f.version }}</span
+                        >
+                        <span
+                            v-if="f.status !== 'completed'"
+                            class="rounded bg-amber-500/10 px-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+                            >{{ f.status_label }}</span
+                        >
+                        <span
+                            v-if="f.by || f.at_label"
+                            class="text-xs text-muted-foreground"
+                            >{{ [f.by, f.at_label].filter(Boolean).join(' · ') }}</span
+                        >
+                    </li>
+                </ul>
                 <div
                     class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground"
                 >

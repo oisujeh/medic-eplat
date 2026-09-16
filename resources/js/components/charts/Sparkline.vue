@@ -36,7 +36,10 @@ const coords = computed(() => {
 
 const linePath = computed(() =>
     coords.value
-        .map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`)
+        .map(
+            (c, i) =>
+                `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`,
+        )
         .join(' '),
 );
 

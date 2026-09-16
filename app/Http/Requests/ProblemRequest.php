@@ -23,6 +23,7 @@ class ProblemRequest extends FormRequest
             'code' => ['nullable', 'string', 'max:50'],
             'status' => ['required', Rule::in([Problem::STATUS_ACTIVE, Problem::STATUS_CHRONIC, Problem::STATUS_RESOLVED])],
             'role' => ['nullable', Rule::in([Problem::ROLE_PRIMARY, Problem::ROLE_SECONDARY, Problem::ROLE_DIFFERENTIAL])],
+            'certainty' => ['nullable', Rule::in([Problem::CERTAINTY_PROVISIONAL, Problem::CERTAINTY_CONFIRMED])],
         ];
     }
 }
