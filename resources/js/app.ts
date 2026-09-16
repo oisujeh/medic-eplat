@@ -13,6 +13,10 @@ createInertiaApp({
         switch (true) {
             case name === 'Welcome':
                 return null;
+            // The first-run wizard stands alone: there is no facility to
+            // frame yet, so no sidebar or breadcrumbs.
+            case name.startsWith('setup/'):
+                return null;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

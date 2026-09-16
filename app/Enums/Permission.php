@@ -1,0 +1,129 @@
+<?php
+
+namespace App\Enums;
+
+/**
+ * The actions a role can be granted beneath its module access. Module access
+ * says which consoles a role can open; a permission says which sensitive
+ * actions it can take there. A role that grants all modules holds every
+ * permission.
+ */
+enum Permission: string
+{
+    case VerifyLabResults = 'laboratory.verify_results';
+    case CancelLabOrders = 'laboratory.cancel_orders';
+    case ManageLabCatalogue = 'laboratory.manage_catalogue';
+    case Dispense = 'pharmacy.dispense';
+    case AdjustStock = 'inventory.adjust_stock';
+    case ApproveRequisitions = 'inventory.approve_requisitions';
+    case IssueStock = 'inventory.issue_stock';
+    case ManageInventorySettings = 'inventory.manage_settings';
+    case RecordPayments = 'billing.record_payments';
+    case ManageFees = 'billing.manage_fees';
+    case ManageClaims = 'claims.manage';
+    case ManagePayers = 'claims.manage_payers';
+    case Discharge = 'admissions.discharge';
+    case ManageWards = 'admissions.manage_wards';
+    case NotifySurveillance = 'surveillance.notify';
+    case ManageSurveillanceCatalogue = 'surveillance.manage_catalogue';
+    case ManageSchedules = 'appointments.manage_schedules';
+    case MergePatients = 'patients.merge';
+    case BreakGlass = 'patients.break_glass';
+    case BackdateEncounters = 'clinical.backdate';
+    case ExportLineLists = 'reports.export_line_lists';
+    case SubmitReports = 'reports.submit';
+    case WaiveDataQualityIssues = 'data-quality.waive_issues';
+    case ManageDataQualityRules = 'data-quality.manage_rules';
+    case ManageForms = 'forms.manage';
+    case VoidForms = 'forms.void';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::MergePatients => 'Merge duplicate patient records',
+            self::BreakGlass => 'Open restricted patient records',
+            self::BackdateEncounters => 'Backdate encounters entered from paper',
+            self::ExportLineLists => 'Export patient-level line lists',
+            self::SubmitReports => 'Submit monthly reports',
+            self::VerifyLabResults => 'Verify and release laboratory results',
+            self::CancelLabOrders => 'Cancel laboratory orders',
+            self::ManageLabCatalogue => 'Edit the test catalogue and reference ranges',
+            self::Dispense => 'Dispense medicines',
+            self::AdjustStock => 'Adjust stock counts',
+            self::ApproveRequisitions => 'Approve stock requisitions',
+            self::IssueStock => 'Issue stock against requisitions',
+            self::ManageInventorySettings => 'Set reorder planning parameters',
+            self::RecordPayments => 'Record payments',
+            self::ManageFees => 'Manage the fee schedule',
+            self::ManageClaims => 'Authorise, submit, remit and reject claims',
+            self::ManagePayers => 'Manage payers and their tariffs',
+            self::Discharge => 'Discharge inpatients',
+            self::ManageWards => 'Manage wards and beds',
+            self::NotifySurveillance => 'Record DSNO notifications',
+            self::ManageSurveillanceCatalogue => 'Manage the notifiable disease catalogue',
+            self::ManageSchedules => 'Manage provider schedules',
+            self::WaiveDataQualityIssues => 'Waive data-quality issues',
+            self::ManageDataQualityRules => 'Manage data-quality rules',
+            self::ManageForms => 'Design, publish and retire clinical forms',
+            self::VoidForms => 'Void completed clinical forms',
+        };
+    }
+
+    /**
+     * The module the permission belongs to, for grouping.
+     */
+    public function module(): string
+    {
+        return explode('.', $this->value, 2)[0];
+    }
+
+    /**
+     * The roles that hold the permission on a fresh installation. Roles that
+     * grant all modules are not listed: they hold everything.
+     *
+     * @return list<string>
+     */
+    public function defaultRoles(): array
+    {
+        return match ($this) {
+            self::MergePatients => ['records-officer', 'chief-medical-director'],
+            self::BreakGlass => ['physician', 'chief-medical-director'],
+            self::BackdateEncounters => ['records-officer', 'chief-medical-director'],
+            self::ExportLineLists => ['records-officer', 'chief-medical-director'],
+            self::SubmitReports => ['records-officer', 'chief-medical-director'],
+            self::VerifyLabResults => ['laboratory-staff', 'chief-medical-director'],
+            self::CancelLabOrders => ['laboratory-staff', 'physician', 'chief-medical-director'],
+            self::ManageLabCatalogue => ['laboratory-staff', 'chief-medical-director'],
+            self::Dispense => ['pharmacy-staff', 'chief-medical-director'],
+            self::AdjustStock => ['inventory-officer', 'pharmacy-staff', 'chief-medical-director'],
+            self::ApproveRequisitions => ['inventory-officer', 'chief-medical-director'],
+            self::IssueStock => ['inventory-officer', 'chief-medical-director'],
+            self::ManageInventorySettings => ['inventory-officer', 'chief-medical-director'],
+            self::RecordPayments => ['cashier', 'chief-medical-director'],
+            self::ManageFees => ['cashier', 'chief-medical-director'],
+            self::ManageClaims => ['cashier', 'chief-medical-director'],
+            self::ManagePayers => ['cashier', 'chief-medical-director'],
+            self::Discharge => ['physician', 'chief-medical-director'],
+            self::ManageWards => ['nurse', 'chief-medical-director'],
+            self::NotifySurveillance => ['physician', 'nurse', 'records-officer', 'chief-medical-director'],
+            self::ManageSurveillanceCatalogue => ['chief-medical-director'],
+            self::ManageSchedules => ['records-officer', 'physician', 'chief-medical-director'],
+            self::WaiveDataQualityIssues => ['records-officer', 'chief-medical-director'],
+            self::ManageDataQualityRules => ['chief-medical-director'],
+            self::ManageForms => [],
+            self::VoidForms => ['physician', 'chief-medical-director'],
+        };
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string, module: string}>
+     */
+    public static function definitions(): array
+    {
+        return array_map(fn (self $p) => [
+            'value' => $p->value,
+            'label' => $p->label(),
+            'module' => $p->module(),
+        ], self::cases());
+    }
+}
